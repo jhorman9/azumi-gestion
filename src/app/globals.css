@@ -1,0 +1,70 @@
+:root {
+  color-scheme: light;
+  --background: #f7f8fa;
+  --foreground: #20232a;
+  --muted: #5e6572;
+  --accent: #315efb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+main {
+  display: grid;
+  min-height: 100vh;
+  place-content: center;
+  padding: 2rem;
+}
+
+.welcome {
+  width: min(100%, 42rem);
+  padding: clamp(2rem, 6vw, 4rem);
+  border: 1px solid #e3e6ec;
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 1rem 3rem rgb(24 39 75 / 8%);
+}
+
+.eyebrow {
+  margin: 0 0 1rem;
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(2rem, 6vw, 3.25rem);
+  letter-spacing: -0.05em;
+}
+
+.description {
+  margin: 1rem 0 2rem;
+  color: var(--muted);
+  font-size: 1.1rem;
+  line-height: 1.7;
+}
+
+.hint {
+  padding: 1rem 1.25rem;
+  border-radius: 0.6rem;
+  background: #f1f4ff;
+  color: #293d87;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+code {
+  font-family: Consolas, "Courier New", monospace;
+}
