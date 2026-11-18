@@ -12,12 +12,14 @@ inventario por ingredientes ni sincronización automática con el POS.
 - Next.js App Router y TypeScript `strict`.
 - Interfaz en español, responsive y accesible con CSS estándar; no Tailwind ni
   shadcn/ui, según la preferencia del proyecto.
-- MySQL administrado por Hostinger/phpMyAdmin y `mysql2/promise`; repositorios
-  SQL explícitos con consultas parametrizadas, sin ORM.
+- MySQL/MariaDB administrado por Hostinger/phpMyAdmin y `mysql2/promise`;
+  repositorios SQL explícitos con consultas parametrizadas, sin ORM.
 - Validación de entrada en servidor; autorización en cada operación del
   servidor, no solo en la interfaz.
 - Capas previstas: UI → acciones/controladores → servicios → repositorios SQL
   → MySQL.
+- Contraseñas con bcrypt; sesiones opacas aleatorias almacenadas como HMAC en
+  MySQL y cookies `HttpOnly`, `SameSite=Lax` y `Secure` en producción.
 - Migraciones secuenciales en `database/migrations/`; cambios financieros con
   auditoría y anulaciones/reversiones en vez de borrado definitivo.
 
@@ -38,9 +40,10 @@ ruta y mutación deberá validar la sesión y el permiso en el servidor.
 
 - Un único cierre confirmado por fecha de operación; la fecha se almacena como
   `DATE` y los cambios de confirmación/corrección quedan auditados.
-- El cierre conserva ventas reportadas por el POS y el desglose de medios de
-  pago como información de conciliación; no se interpreta como efectivo ya
-  disponible.
+- `reported_sales_total` conserva sin reinterpretar el total mostrado en el
+  reporte del POS. Los ajustes indican si el POS ya los incluyó; hasta verificar
+  esa convención, no se suman ni restan para inferir otro total. El desglose de
+  medios de pago sirve para conciliación, no equivale a efectivo disponible.
 - Una factura de proveedor representa una obligación. Sus pagos parciales
   reducen el saldo pendiente; la factura no se vuelve a registrar como gasto.
 - Reportes separarán ventas reportadas, importes cobrados, gastos incurridos,
@@ -49,17 +52,21 @@ ruta y mutación deberá validar la sesión y el permiso en el servidor.
 - Importes MySQL `DECIMAL(12,2)` se mantienen como decimales/cadenas y no se
   calculan con `float` de JavaScript.
 - Zona horaria de negocio: `America/Panama`; fechas de operación no se
-  convierten como timestamps. Los timestamps técnicos se guardan en UTC cuando
-  aplique.
+  convierten como timestamps. La aplicación escribe timestamps técnicos en
+  UTC; horarios de promociones se capturan en hora de Panamá y se convierten a
+  UTC al persistirlos.
 - Las promociones no cambian el precio base, no se acumulan y no modifican el
-  POS; el precio efectivo se calcula y se prueba en el servidor.
+  POS; el precio efectivo se calcula y se prueba en el servidor. Una promoción
+  debe apuntar a productos o a categorías, no a ambos; la validación se hará en
+  el servicio de dominio.
 
 ## Plan por fases y dependencias
 
 1. **Fase 0 — Preparación:** validar el runtime real de Hostinger, acordar
    contratos de datos y modelo SQL, documentar navegación/roles, configurar
-   entorno, conexión MySQL y controles de calidad. Bloquea el diseño final de
-   migraciones la verificación de versiones y límites del plan.
+   entorno, conexión MySQL y controles de calidad. La conexión actual reporta
+   MariaDB 11.8.9; falta confirmar que sea el servidor del plan de despliegue y
+   verificar sus límites.
 2. **Fase 1 — MVP gerencial:** autenticación privada y administración mínima
    de usuarios → cierres diarios y auditoría → gastos, proveedores y facturas
    con pagos → dashboard y reportes. Los reportes dependen de las reglas de
@@ -74,10 +81,12 @@ ruta y mutación deberá validar la sesión y el permiso en el servidor.
 
 ## Bloqueos externos por resolver
 
-Antes de cerrar la compatibilidad de despliegue se necesita el plan exacto de
-Hostinger y confirmar que ejecuta Next.js en servidor, además de sus versiones
-de Node.js y MySQL, límites de memoria/procesos/conexiones y método de
-despliegue. No se presume acceso SSH, cron ni conexiones externas a MySQL.
+El usuario confirmó que el plan de Hostinger ofrece Node.js 22.x. Next.js
+16.4.6 declara Node.js `>=20.9.0`, por lo que 22.x satisface el requisito del
+framework. Antes de cerrar la compatibilidad de despliegue, confirmar que el
+plan admita Next.js SSR, las versiones de MySQL/MariaDB, límites de
+memoria/procesos/conexiones y método de despliegue. No se presume acceso SSH,
+cron ni conexiones externas a MySQL.
 
 La integración futura del menú requiere conocer cómo consume datos la web
 existente. La importación CSV requiere un archivo real de ejemplo. Ninguna de
@@ -89,6 +98,9 @@ las dos se inventará.
   marcadores, nunca credenciales reales.
 - Cookies de sesión `HttpOnly`, `SameSite` y `Secure` en producción; hash de
   contraseña seguro, sin registro público y límites de intentos de login.
+- La Fase 1 limita a cinco intentos fallidos por cuenta cada 15 minutos. El
+  primer administrador se aprovisiona por CLI; no hay formulario público de
+  registro.
 - Consultas SQL parametrizadas, validación y autorización en servidor, auditoría
   de acciones sensibles y límites para archivos si se habilitan adjuntos.
 - Pool MySQL pequeño y reutilizado; transacciones para operaciones financieras.

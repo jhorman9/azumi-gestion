@@ -18,6 +18,38 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+button,
+input,
+select {
+  font: inherit;
+}
+
+button,
+.text-link {
+  min-height: 2.75rem;
+  border: 0;
+  border-radius: 0.55rem;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 0.7rem 1rem;
+  text-decoration: none;
+}
+
+button:hover,
+.text-link:hover {
+  background: #244bd3;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+a:focus-visible {
+  outline: 3px solid #91a8ff;
+  outline-offset: 2px;
+}
+
 main {
   display: grid;
   min-height: 100vh;
@@ -67,4 +99,157 @@ h1 {
 
 code {
   font-family: Consolas, "Courier New", monospace;
+}
+
+.auth-page {
+  align-content: center;
+  justify-items: center;
+}
+
+.auth-card {
+  width: min(100%, 28rem);
+  padding: clamp(1.5rem, 5vw, 2.5rem);
+  border: 1px solid #e3e6ec;
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 1rem 3rem rgb(24 39 75 / 8%);
+}
+
+.auth-card h1,
+.dashboard-header h1 {
+  margin: 0;
+  font-size: clamp(1.8rem, 5vw, 2.5rem);
+  letter-spacing: -0.04em;
+}
+
+.auth-form {
+  display: grid;
+  gap: 1.15rem;
+  margin-top: 1.75rem;
+}
+
+.auth-form label {
+  display: grid;
+  gap: 0.45rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.auth-form input,
+.auth-form select {
+  width: 100%;
+  min-height: 2.9rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #cbd1dc;
+  border-radius: 0.5rem;
+  background: #fff;
+  color: var(--foreground);
+}
+
+.form-error {
+  margin: 1.25rem 0 0;
+  padding: 0.85rem 1rem;
+  border-radius: 0.5rem;
+  background: #fff0ef;
+  color: #a1261d;
+  line-height: 1.5;
+}
+
+.dashboard-page {
+  align-content: start;
+  justify-items: center;
+  gap: 1.5rem;
+  padding-top: clamp(2rem, 7vh, 5rem);
+}
+
+.dashboard-header,
+.dashboard-card {
+  width: min(100%, 56rem);
+}
+
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.dashboard-card {
+  padding: clamp(1.5rem, 5vw, 2.5rem);
+  border: 1px solid #e3e6ec;
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 1rem 3rem rgb(24 39 75 / 8%);
+  line-height: 1.6;
+}
+
+.dashboard-card h2 {
+  margin-top: 0;
+}
+
+.account-info {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.button-secondary {
+  border: 1px solid #cbd1dc;
+  background: #fff;
+  color: var(--foreground);
+}
+
+.button-secondary:hover {
+  background: #eef1f6;
+}
+
+.text-link {
+  display: inline-flex;
+  align-items: center;
+}
+
+.button-secondary.text-link {
+  background: #fff;
+  color: var(--foreground);
+}
+
+.success-message,
+.dashboard-page > .form-error {
+  width: min(100%, 56rem);
+}
+
+.success-message {
+  margin: 0;
+  padding: 0.85rem 1rem;
+  border-radius: 0.5rem;
+  background: #eaf7ed;
+  color: #1d6b31;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+th,
+td {
+  padding: 0.8rem 0.65rem;
+  border-bottom: 1px solid #e3e6ec;
+  vertical-align: middle;
+}
+
+th {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+@media (max-width: 36rem) {
+  .dashboard-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }

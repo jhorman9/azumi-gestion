@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Mi aplicación",
-  description: "Proyecto creado con Next.js",
+  title: "CRM Gerencial",
+  description: "Administración interna del restaurante",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
