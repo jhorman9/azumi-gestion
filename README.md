@@ -4,6 +4,11 @@ Aplicación privada para registrar cierres diarios del POS, gastos, proveedores,
 cuentas por pagar y administrar el menú digital. No reemplaza el POS ni crea
 una web pública de pedidos.
 
+El MVP gerencial incluye autenticación privada, cierres diarios auditables,
+registro de gastos, directorio de proveedores, facturas con pagos parciales y
+reportes por período. Los reportes separan ventas, gastos incurridos, pagos y
+obligaciones; no calculan utilidad neta.
+
 ## Desarrollo local
 
 Requisitos: Node.js compatible con Next.js 16 y una instancia MySQL/MariaDB
@@ -11,7 +16,7 @@ accesible desde el servidor de desarrollo.
 
 1. Instala dependencias: `npm install`
 2. Copia `.env.example` a `.env` y configura la conexión MySQL.
-3. Aplica la migración inicial desde phpMyAdmin.
+3. Aplica en orden las migraciones de `database/migrations/` desde phpMyAdmin.
 4. Crea la primera cuenta administradora con `npm run admin:create` desde una
    terminal interactiva y con `.env` configurado.
 5. Inicia el servidor: `npm run dev` y entra en `/login`.

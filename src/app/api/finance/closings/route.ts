@@ -1,0 +1,167 @@
+import { NextResponse } from "next/server";
+import type { ResultSetHeader } from "mysql2";
+import type { PoolConnection } from "mysql2/promise";
+import { getCurrentUser } from "@/lib/auth/session";
+import { hasPermission } from "@/lib/auth/roles";
+import { writeAuditLog } from "@/lib/finance/audit";
+import { collectClosingFormFields } from "@/lib/finance/closing";
+import { formFields } from "@/lib/finance/form";
+import { getDbPool } from "@/lib/db";
+import { hasSameOrigin } from "@/lib/security/origin";
+import { closingFormSchema } from "@/lib/validation/finance";
+
+function redirectToClosings(request: Request, result: string) {
+  return NextResponse.redirect(
+    new URL(`/dashboard/closings?${result}`, request.url),
+    303,
+  );
+}
+
+export async function POST(request: Request) {
+  if (!hasSameOrigin(request)) {
+    return NextResponse.json({ error: "Solicitud no válida." }, { status: 403 });
+  }
+
+  const actor = await getCurrentUser();
+
+  if (!actor) {
+    return NextResponse.json({ error: "No autorizado." }, { status: 401 });
+  }
+
+  if (!hasPermission(actor.role, "closings:write")) {
+    return NextResponse.json({ error: "Acceso denegado." }, { status: 403 });
+  }
+
+  let formData: FormData;
+
+  try {
+    formData = await request.formData();
+  } catch {
+    return redirectToClosings(request, "error=invalid");
+  }
+
+  const parsed = closingFormSchema.safeParse(
+    collectClosingFormFields(formFields(formData)),
+  );
+
+  if (!parsed.success || parsed.data.action === "correct") {
+    return redirectToClosings(request, "error=invalid");
+  }
+
+  let connection: PoolConnection | undefined;
+  let transactionStarted = false;
+
+  try {
+    connection = await getDbPool().getConnection();
+    await connection.beginTransaction();
+    transactionStarted = true;
+
+    const confirmed = parsed.data.action === "confirm";
+    const [result] = await connection.execute<ResultSetHeader>(
+      `INSERT INTO daily_closings
+        (operation_date, reported_sales_total, pedidos_ya_total, status, notes,
+         created_by, confirmed_by, confirmed_at, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, IF(? = 1, UTC_TIMESTAMP(3), NULL),
+         UTC_TIMESTAMP(3), UTC_TIMESTAMP(3))`,
+      [
+        parsed.data.operation_date,
+        parsed.data.reported_sales_total,
+        parsed.data.pedidos_ya_total,
+        confirmed ? "confirmed" : "draft",
+        parsed.data.notes,
+        actor.id,
+        confirmed ? actor.id : null,
+        confirmed ? 1 : 0,
+      ],
+    );
+    const closingId = String(result.insertId);
+
+    for (const payment of parsed.data.channel_payments) {
+      await connection.execute(
+        `INSERT INTO daily_closing_channel_payments
+          (daily_closing_id, payment_type, payment_channel, amount)
+         VALUES (?, ?, ?, ?)`,
+        [
+          closingId,
+          payment.payment_type,
+          payment.payment_channel,
+          payment.amount,
+        ],
+      );
+    }
+
+    for (const [index, outflow] of parsed.data.cash_outflows.entries()) {
+      if (outflow.description === null) {
+        continue;
+      }
+
+      await connection.execute(
+        `INSERT INTO daily_closing_cash_outflows
+          (daily_closing_id, line_number, description, amount)
+         VALUES (?, ?, ?, ?)`,
+        [closingId, index + 1, outflow.description, outflow.amount],
+      );
+    }
+
+    for (const [index, tip] of parsed.data.tips.entries()) {
+      if (tip.recipient === null) {
+        continue;
+      }
+
+      await connection.execute(
+        `INSERT INTO daily_closing_tips
+          (daily_closing_id, line_number, recipient_name, amount)
+         VALUES (?, ?, ?, ?)`,
+        [closingId, index + 1, tip.recipient, tip.amount],
+      );
+    }
+
+    await writeAuditLog(connection, {
+      actorUserId: actor.id,
+      entityType: "daily_closing",
+      entityId: closingId,
+      action: confirmed ? "confirmed" : "created",
+      afterData: {
+        operation_date: parsed.data.operation_date,
+        reported_sales_total: parsed.data.reported_sales_total,
+        pedidos_ya_total: parsed.data.pedidos_ya_total,
+        channel_payments: parsed.data.channel_payments,
+        cash_outflows: parsed.data.cash_outflows,
+        tips: parsed.data.tips,
+        status: confirmed ? "confirmed" : "draft",
+      },
+    });
+
+    await connection.commit();
+    transactionStarted = false;
+    return redirectToClosings(
+      request,
+      confirmed ? "created=confirmed" : "created=draft",
+    );
+  } catch (error) {
+    if (transactionStarted && connection) {
+      try {
+        await connection.rollback();
+      } catch {
+        console.error("Daily closing rollback failed.");
+      }
+    }
+
+    const code =
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      typeof error.code === "string"
+        ? error.code
+        : "UNKNOWN";
+
+    if (code === "ER_DUP_ENTRY") {
+      return redirectToClosings(request, "error=duplicate");
+    }
+
+    console.error(`Daily closing creation failed (${code}).`);
+    return redirectToClosings(request, "error=failed");
+  } finally {
+    connection?.release();
+  }
+}

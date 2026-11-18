@@ -40,12 +40,26 @@ ruta y mutación deberá validar la sesión y el permiso en el servidor.
 
 - Un único cierre confirmado por fecha de operación; la fecha se almacena como
   `DATE` y los cambios de confirmación/corrección quedan auditados.
-- `reported_sales_total` conserva sin reinterpretar el total mostrado en el
-  reporte del POS. Los ajustes indican si el POS ya los incluyó; hasta verificar
-  esa convención, no se suman ni restan para inferir otro total. El desglose de
-  medios de pago sirve para conciliación, no equivale a efectivo disponible.
-- Una factura de proveedor representa una obligación. Sus pagos parciales
-  reducen el saldo pendiente; la factura no se vuelve a registrar como gasto.
+- Los cierres se guardan como borradores o se confirman; corregir un cierre
+  confirmado exige un motivo y conserva el antes/después en la auditoría.
+- El cierre conserva por separado `reported_sales_total` (Reporte Z) y
+  `pedidos_ya_total` (Pedidos Ya). El total de ventas es Reporte Z + Pedidos Ya;
+  Pedidos Ya no forma parte del desglose de Reporte Z.
+- La matriz de Tarjeta de crédito/Clave por Punto de Venta, BAC, Banesco, Yappy
+  y ACH desglosa Reporte Z, no representa ventas adicionales. Total Banco es la
+  suma de sus diez celdas.
+- Total Dinero se calcula como Reporte Z + Pedidos Ya − salidas de caja. Las
+  salidas conservan descripción e importe en el cierre y no crean gastos. Las
+  propinas se guardan por persona e importe; su total es calculado. “Realizado
+  por” corresponde al usuario autenticado que creó el cierre.
+- La migración del formato PDF conserva los cierres y sus datos genéricos
+  históricos; no los convierte a la matriz nueva por no existir una equivalencia
+  contable fiable.
+- Los gastos registran fecha incurrida y, al pagarse, fecha efectiva y medio de
+  pago. Las facturas de proveedores son obligaciones separadas; los pagos
+  parciales se registran contra el saldo y no vuelven a sumarse como gasto.
+- Una factura de proveedor representa una obligación; sus pagos parciales
+  reducen el saldo pendiente y no se vuelven a registrar como gasto.
 - Reportes separarán ventas reportadas, importes cobrados, gastos incurridos,
   importes pagados y obligaciones pendientes. No se etiquetará una resta
   incompleta como “ganancia neta”.

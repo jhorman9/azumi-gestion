@@ -20,7 +20,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -45,6 +46,7 @@ button:hover,
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
+textarea:focus-visible,
 a:focus-visible {
   outline: 3px solid #91a8ff;
   outline-offset: 2px;
@@ -229,6 +231,263 @@ code {
   overflow-x: auto;
 }
 
+.manager-header,
+.page-content {
+  width: min(100%, 80rem);
+}
+
+.manager-header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 1rem 1.5rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid #e3e6ec;
+  border-radius: 0.8rem;
+  background: #fff;
+}
+
+.manager-identity {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.manager-brand {
+  color: var(--foreground);
+  font-size: 1.1rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.manager-identity span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.manager-nav {
+  display: flex;
+  grid-column: 1 / -1;
+  grid-row: 2;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.9rem;
+}
+
+.manager-nav a {
+  color: #293d87;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.manager-nav a:hover,
+.page-content a:not(.text-link):hover {
+  text-decoration: underline;
+}
+
+.page-content {
+  display: grid;
+  justify-items: stretch;
+  gap: 1.5rem;
+}
+
+.page-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.page-heading h1 {
+  font-size: clamp(1.8rem, 5vw, 2.5rem);
+}
+
+.page-heading > p,
+.form-hint,
+.empty-state {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.finance-form {
+  display: grid;
+  gap: 1.15rem;
+  margin-top: 1.25rem;
+}
+
+.form-grid,
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: 1rem;
+}
+
+.finance-form label,
+.inline-form label {
+  display: grid;
+  gap: 0.45rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.finance-form input,
+.finance-form select,
+.finance-form textarea,
+.inline-form input,
+.inline-form select,
+.row-actions input,
+.row-actions select {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid #cbd1dc;
+  border-radius: 0.5rem;
+  background: #fff;
+  color: var(--foreground);
+}
+
+.finance-form textarea {
+  resize: vertical;
+}
+
+.finance-form fieldset {
+  display: grid;
+  gap: 0.9rem;
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid #dfe3eb;
+  border-radius: 0.65rem;
+}
+
+.finance-form legend {
+  padding: 0 0.4rem;
+  font-weight: 700;
+}
+
+.form-hint {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.closing-matrix {
+  min-width: 62rem;
+}
+
+.closing-entry-table {
+  min-width: 36rem;
+}
+
+.closing-matrix input,
+.closing-entry-table input {
+  min-width: 7rem;
+}
+
+.closing-entry-table td:first-of-type input {
+  min-width: 14rem;
+}
+
+.closing-totals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: 0.8rem;
+}
+
+.closing-totals article {
+  padding: 1rem;
+  border: 1px solid #e3e6ec;
+  border-radius: 0.65rem;
+  background: #f8f9fc;
+}
+
+.closing-totals h3 {
+  margin: 0 0 0.4rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.closing-totals p {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.closing-totals span {
+  display: block;
+  margin-top: 0.35rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.adjustment-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.adjustment-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.form-actions,
+.inline-form,
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.75rem;
+}
+
+.inline-form {
+  margin: 0.75rem 0;
+}
+
+.inline-form label {
+  min-width: min(100%, 12rem);
+}
+
+.row-actions {
+  min-width: 13rem;
+  align-items: stretch;
+}
+
+.row-actions .inline-form {
+  min-width: 20rem;
+}
+
+.metric-card {
+  display: grid;
+  align-content: start;
+  gap: 0.65rem;
+  min-height: 9rem;
+  padding: 1.25rem;
+  border: 1px solid #e3e6ec;
+  border-radius: 0.8rem;
+  background: #fff;
+}
+
+.metric-card h2 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.metric-card p {
+  margin: 0;
+  font-size: clamp(1.4rem, 4vw, 2rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.metric-card span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.empty-state {
+  margin-bottom: 0;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -251,5 +510,28 @@ th {
   .dashboard-header {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .manager-header {
+    grid-template-columns: 1fr auto;
+  }
+
+  .manager-nav {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .page-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .adjustment-row {
+    grid-template-columns: 1fr;
+  }
+
+  .form-actions > button,
+  .inline-form > button {
+    flex: 1 1 12rem;
   }
 }

@@ -10,6 +10,11 @@ finanzas, menú y promociones. Está diseñado para MySQL/MariaDB con InnoDB;
 `.env` respondió con MariaDB 11.8.9. Confirma que ese servidor corresponde al
 destino de despliegue antes de aplicar la migración.
 
+`002_cash_closing_pdf_format.sql` adapta los cierres al formulario aprobado:
+Reporte Z y Pedidos Ya separados, matriz bancaria, salidas de caja y propinas
+por persona. Es aditiva: conserva los cierres y datos del formato anterior; no
+convierte los medios de pago genéricos porque no existe una equivalencia fiable.
+
 Selecciona la base correcta en phpMyAdmin, revisa el script y ejecútalo una
 sola vez. El script registra su versión en `schema_migrations` al final. La
 migración inicial se aplicó manualmente a la base configurada durante el
