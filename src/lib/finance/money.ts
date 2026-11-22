@@ -73,6 +73,18 @@ export function subtractMoney(
   return centsToMoney(cents);
 }
 
+export function subtractMoneyAllowNegative(
+  amount: string | number,
+  deduction: string | number,
+): string {
+  const cents = moneyToCents(amount) - moneyToCents(deduction);
+  if (cents < BigInt(0)) {
+    return `-${centsToMoney(-cents)}`;
+  }
+
+  return centsToMoney(cents);
+}
+
 export function formatMoney(value: string | number | null | undefined): string {
   const raw = String(value ?? "0").trim();
   const negative = raw.startsWith("-");

@@ -8,13 +8,19 @@ import {
 import {
   buildFinanceTrend,
   type FinanceTrendAmount,
+  type FinanceTrendExpenseAmount,
   type FinanceTrendGranularity,
   type FinanceTrendPoint,
 } from "@/lib/finance/trend";
+import { subtractMoneyAllowNegative } from "@/lib/finance/money";
 
 export interface FinanceSummary {
   salesTotal: string;
+  salesAfterUnassignedExpenses: string;
   expenseIncurred: string;
+  expenseIncurredDeducted: string;
+  expenseIncurredNotDeducted: string;
+  closingExpenseDeductions: string;
   expensePaid: string;
   supplierBillsIssued: string;
   supplierPayments: string;
@@ -25,19 +31,22 @@ export interface FinanceSummary {
 interface AmountRow extends RowDataPacket {
   amount: string;
   overdue_amount?: string;
+  deducted_amount?: string;
+  not_deducted_amount?: string;
 }
 
 interface TrendRow extends RowDataPacket, FinanceTrendAmount {}
+
+interface TrendExpenseRow extends RowDataPacket, FinanceTrendExpenseAmount {}
 
 export async function getFinanceTrend(
   pool: Pool,
   range: DateRange,
   granularity: FinanceTrendGranularity,
 ): Promise<FinanceTrendPoint[]> {
-  const { startUtc, endUtcExclusive } = businessRangeUtc(range.start, range.end);
   const bucketFormat =
     granularity === "day" ? "%Y-%m-%d" : "%Y-%m";
-  const [[salesRows], [incurredRows], [paidRows]] = await Promise.all([
+  const [[salesRows], [expenseRows]] = await Promise.all([
     pool.execute<TrendRow[]>(
       `SELECT DATE_FORMAT(operation_date, ?) AS bucket,
               COALESCE(SUM(reported_sales_total), 0.00) AS amount
@@ -47,30 +56,21 @@ export async function getFinanceTrend(
        GROUP BY bucket`,
       [bucketFormat, range.start, range.end],
     ),
-    pool.execute<TrendRow[]>(
+    pool.execute<TrendExpenseRow[]>(
       `SELECT DATE_FORMAT(incurred_on, ?) AS bucket,
-              COALESCE(SUM(amount), 0.00) AS amount
+              COALESCE(SUM(CASE WHEN deduct_from_closing = 1 THEN amount ELSE 0.00 END), 0.00) AS deducted,
+              COALESCE(SUM(CASE WHEN deduct_from_closing = 0 THEN amount ELSE 0.00 END), 0.00) AS not_deducted
        FROM expenses
        WHERE status = 'paid'
          AND incurred_on BETWEEN ? AND ?
        GROUP BY bucket`,
       [bucketFormat, range.start, range.end],
     ),
-    pool.execute<TrendRow[]>(
-      `SELECT DATE_FORMAT(DATE_SUB(paid_at, INTERVAL 5 HOUR), ?) AS bucket,
-              COALESCE(SUM(amount), 0.00) AS amount
-       FROM expenses
-       WHERE status = 'paid'
-         AND paid_at >= ? AND paid_at < ?
-       GROUP BY bucket`,
-      [bucketFormat, startUtc, endUtcExclusive],
-    ),
   ]);
 
   return buildFinanceTrend(range, granularity, {
     sales: salesRows,
-    expensesIncurred: incurredRows,
-    expensesPaid: paidRows,
+    expenseTreatment: expenseRows,
   });
 }
 
@@ -83,6 +83,7 @@ export async function getFinanceSummary(
   const [
     [salesRows],
     [incurredRows],
+    [closingDeductionRows],
     [expensePaymentRows],
     [billRows],
     [billPaymentRows],
@@ -96,10 +97,23 @@ export async function getFinanceSummary(
       [range.start, range.end],
     ),
     pool.execute<AmountRow[]>(
-      `SELECT COALESCE(SUM(amount), 0.00) AS amount
+      `SELECT COALESCE(SUM(amount), 0.00) AS amount,
+              COALESCE(SUM(CASE WHEN deduct_from_closing = 1 THEN amount ELSE 0.00 END), 0.00) AS deducted_amount,
+              COALESCE(SUM(CASE WHEN deduct_from_closing = 0 THEN amount ELSE 0.00 END), 0.00) AS not_deducted_amount
        FROM expenses
        WHERE status = 'paid'
          AND incurred_on BETWEEN ? AND ?`,
+      [range.start, range.end],
+    ),
+    pool.execute<AmountRow[]>(
+      `SELECT COALESCE(SUM(e.amount), 0.00) AS amount
+       FROM expenses e
+       INNER JOIN daily_closings c
+         ON c.operation_date = e.closing_operation_date
+       WHERE e.status = 'paid'
+         AND e.deduct_from_closing = 1
+         AND c.status IN ('confirmed', 'corrected')
+         AND c.operation_date BETWEEN ? AND ?`,
       [range.start, range.end],
     ),
     pool.execute<AmountRow[]>(
@@ -144,9 +158,21 @@ export async function getFinanceSummary(
     ),
   ]);
 
+  const salesTotal = salesRows[0]?.amount ?? "0.00";
+  const expensesWithoutClosing = incurredRows[0]?.not_deducted_amount ?? "0.00";
+
   return {
-    salesTotal: salesRows[0]?.amount ?? "0.00",
+    salesTotal,
+    salesAfterUnassignedExpenses: subtractMoneyAllowNegative(
+      salesTotal,
+      expensesWithoutClosing,
+    ),
     expenseIncurred: incurredRows[0]?.amount ?? "0.00",
+    expenseIncurredDeducted:
+      incurredRows[0]?.deducted_amount ?? "0.00",
+    expenseIncurredNotDeducted:
+      incurredRows[0]?.not_deducted_amount ?? "0.00",
+    closingExpenseDeductions: closingDeductionRows[0]?.amount ?? "0.00",
     expensePaid: expensePaymentRows[0]?.amount ?? "0.00",
     supplierBillsIssued: billRows[0]?.amount ?? "0.00",
     supplierPayments: billPaymentRows[0]?.amount ?? "0.00",

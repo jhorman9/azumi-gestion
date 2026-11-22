@@ -11,6 +11,7 @@ import {
   WalletCards,
 } from "lucide-react";
 import { FinanceTrendChart } from "@/app/components/finance-trend-chart";
+import { ExpenseTreatmentBreakdown } from "@/app/components/expense-treatment-breakdown";
 import { MetricCard } from "@/app/components/metric-card";
 import { ManagerNav } from "@/app/components/manager-nav";
 import { PayablesDonutChart } from "@/app/components/payables-donut-chart";
@@ -153,21 +154,21 @@ export default async function DashboardPage({
         </form>
         <section aria-label="Indicadores del período" className="metric-grid">
           <MetricCard
-            hint="Cierres confirmados después de gastos descontados"
+            hint="Reporte Z neto menos gastos sin descuento de cierre; puede ser negativo"
             icon={CircleDollarSign}
-            label="Reporte Z neto del período"
+            label="Reporte Z − gastos sin descuento"
             tone="red"
-            value={formatMoney(summary.salesTotal)}
+            value={formatMoney(summary.salesAfterUnassignedExpenses)}
           />
           <MetricCard
-            hint="Excluye gastos anulados"
+            hint="Gastos pagados por fecha del gasto; incluye ambas categorías"
             icon={ReceiptText}
             label="Gastos incurridos"
             tone="amber"
             value={formatMoney(summary.expenseIncurred)}
           />
           <MetricCard
-            hint="Según fecha efectiva de pago"
+            hint="Según fecha de pago; incluye ambas categorías"
             icon={CircleCheck}
             label="Gastos pagados"
             tone="green"
@@ -201,6 +202,14 @@ export default async function DashboardPage({
             value={formatMoney(summary.overduePayables)}
           />
         </section>
+        <ExpenseTreatmentBreakdown
+          closingExpenseDeductions={summary.closingExpenseDeductions}
+          expenseIncurred={summary.expenseIncurred}
+          expenseIncurredDeducted={summary.expenseIncurredDeducted}
+          expenseIncurredNotDeducted={summary.expenseIncurredNotDeducted}
+          salesTotal={summary.salesTotal}
+          salesAfterUnassignedExpenses={summary.salesAfterUnassignedExpenses}
+        />
         <div className="dashboard-bottom-grid">
           <section className="dashboard-card">
             <div className="section-heading">
@@ -215,8 +224,10 @@ export default async function DashboardPage({
               points={trend}
             />
             <p className="chart-caption">
-              Compara Reporte Z neto, gastos incurridos y pagos de gastos por{" "}
-              {period === "year" ? "mes" : "día"}. No representa utilidad neta.
+              El gráfico muestra el Reporte Z neto real de los cierres y los
+              gastos por fecha del gasto. El indicador del resumen resta
+              además los gastos sin descuento de cierre; no representa
+              utilidad neta.
             </p>
           </section>
           <section className="dashboard-card payables-card">

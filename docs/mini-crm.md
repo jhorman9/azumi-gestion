@@ -44,10 +44,13 @@ comprueba el correo, la contraseña y que el usuario siga activo.
 
 Presenta los indicadores del período seleccionado:
 
-- **Reporte Z neto:** suma de cierres confirmados o corregidos, después de las
-  salidas de caja y los gastos pagados asignados a cierres.
-- **Gastos incurridos:** gastos pagados por fecha del gasto; excluye los
-  anulados.
+- **Reporte Z neto − gastos sin descuento:** Reporte Z neto de los cierres
+  confirmados o corregidos, menos los gastos pagados no asignados a un cierre
+  por fecha del gasto. Puede ser negativo; ese valor registra una pérdida.
+  Los gastos asignados a cierres ya están descontados del Reporte Z y no se
+  restan de nuevo.
+- **Gastos incurridos:** gastos pagados por fecha del gasto; se desglosan entre
+  los que tienen descuento de cierre asignado y los que no.
 - **Gastos pagados:** gastos pagados según su fecha efectiva de pago.
 - **Facturas emitidas:** obligaciones abiertas con fecha de emisión dentro del
   período.
@@ -60,9 +63,13 @@ predeterminada se muestra el mes actual en la zona horaria de Panamá. Los meses
 incluyen todos sus días —incluido el 29 de febrero en años bisiestos— y el año
 va del 1 de enero al 31 de diciembre.
 
-El gráfico compara ventas, gastos incurridos y gastos pagados como referencia;
-en la vista mensual muestra la evolución diaria y en la anual la evolución por
-mes. Al pasar el puntero sobre los puntos se muestra el valor exacto. No
+El resumen muestra el Reporte Z neto de cierres menos los gastos sin descuento
+de cierre. El panel de tratamiento muestra los importes usados en ese cálculo,
+separa los gastos por fecha del gasto y también muestra lo descontado en
+cierres confirmados/corregidos por fecha del cierre. El gráfico conserva el
+Reporte Z real de los cierres y compara ambas categorías de gastos; en la vista
+mensual muestra la evolución diaria y en la anual la evolución por mes. Al
+pasar el puntero sobre los puntos se muestra el valor exacto. El resumen no
 representa utilidad neta. Un gráfico de anillo separa el saldo pendiente actual
 entre facturas al día y vencidas; no es un saldo histórico del período. El
 sidebar puede ocultarse o mostrarse y recuerda la preferencia en el navegador.
@@ -110,11 +117,24 @@ Registra gastos pagados a proveedores. Cada gasto incluye proveedor, fecha del
 gasto, importe, método de pago y si debe descontarse del cierre de caja de una
 fecha determinada.
 
-Los métodos disponibles son efectivo, tarjeta y Yappy. Si marcas que el gasto
-se descuenta de un cierre, selecciona su fecha de operación. El gasto solo se
-aplica al cierre cuando está pagado y su fecha asignada coincide con la fecha
-del cierre. El formulario o el detalle permite editar información y anular un
-registro; la anulación queda auditada y evita borrar el historial.
+Los métodos disponibles son efectivo, tarjeta y Yappy. En **Tratamiento en el
+cierre**, selecciona explícitamente si el gasto se descuenta:
+
+- **Sí, descontar:** el gasto pagado se asigna a la fecha de cierre indicada y
+  reduce su efectivo y Reporte Z neto. Cuando el cierre está confirmado o
+  corregido, el descuento ya forma parte del Reporte Z neto.
+- **No descontar:** el gasto se conserva en los informes, pero no cambia el
+  efectivo ni el Reporte Z de ningún cierre.
+
+La lista identifica si el gasto no descuenta, está asignado a un cierre
+pendiente o ya se descontó de un cierre confirmado. El formulario o el detalle
+permite editar información y anular un registro; la anulación queda auditada y
+evita borrar el historial.
+
+La estadística mensual permite consultar un mes específico y muestra cuánto se
+resta del Reporte Z del período por gastos sin asignación a cierres, junto con
+el monto de gastos asignados y el total pagado. Los importes se agrupan por la
+fecha del gasto; la deducción de un gasto asignado usa la fecha del cierre.
 
 La lista está paginada. Antes de anular o cambiar un gasto asignado, revisa el
 cierre asociado y el nuevo efectivo neto.

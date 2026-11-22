@@ -17,8 +17,16 @@ const plotHeight = plotBottom - plotTop;
 const plotWidth = plotRight - plotLeft;
 const series = [
   { key: "salesTotal", label: "Reporte Z neto", color: "#b4232c" },
-  { key: "expenseIncurred", label: "Gastos incurridos", color: "#d9942e" },
-  { key: "expensePaid", label: "Gastos pagados", color: "#43886a" },
+  {
+    key: "expenseDeducted",
+    label: "Marcados para descuento de cierre",
+    color: "#d9942e",
+  },
+  {
+    key: "expenseNotDeducted",
+    label: "Sin descuento de cierre",
+    color: "#43886a",
+  },
 ] as const;
 
 function compactMoney(cents: bigint): string {
@@ -194,7 +202,8 @@ export function FinanceTrendChart({
           Tendencia de Reporte Z neto y gastos del período seleccionado
         </title>
         <desc>
-          Compara Reporte Z neto, gastos incurridos y gastos pagados por{" "}
+          Compara Reporte Z neto y gastos por tratamiento de cierre, según la
+          fecha del gasto, por{" "}
           {granularity === "day" ? "día" : "mes"}.
         </desc>
         {[0, 1, 2, 3, 4].map((step) => {
