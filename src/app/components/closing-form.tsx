@@ -247,194 +247,228 @@ export function ClosingForm({
       <form
         action={actionUrl}
         method="post"
-        className="finance-form"
+        aria-busy={isSubmitting}
+        className="finance-form closing-form"
         noValidate
         onChange={updateTotals}
         onSubmit={validateBeforeSubmit}
       >
-      <div className="form-grid">
-        <label>
-          Fecha
-          <input
-            defaultValue={initial.operation_date}
-            max="9999-12-31"
-            name="operation_date"
-            required
-            type="date"
-          />
-        </label>
-        <label>
-          Pedidos Ya
-          <input
-            defaultValue={initial.pedidos_ya_total}
-            min="0"
-            name="pedidos_ya_total"
-            required
-            step="0.01"
-            type="number"
-          />
-        </label>
-        <label>
-          Efectivo contado (antes de salidas)
-          <input
-            defaultValue={initial.cash_total}
-            min="0"
-            name="cash_total"
-            required
-            step="0.01"
-            type="number"
-          />
-        </label>
-      </div>
+        <section className="closing-section">
+          <div className="closing-section-heading">
+            <span className="closing-step">1</span>
+            <div>
+              <h3>Datos del día</h3>
+              <p>Indica la fecha de operación y los importes principales.</p>
+            </div>
+          </div>
+          <div className="form-grid">
+            <label>
+              Fecha del cierre
+              <input
+                defaultValue={initial.operation_date}
+                max="9999-12-31"
+                name="operation_date"
+                required
+                type="date"
+              />
+              <small className="field-hint">
+                Selecciona el día al que corresponden estos datos.
+              </small>
+            </label>
+            <label>
+              Total de Pedidos Ya
+              <input
+                defaultValue={initial.pedidos_ya_total}
+                inputMode="decimal"
+                min="0"
+                name="pedidos_ya_total"
+                placeholder="0.00"
+                required
+                step="0.01"
+                type="number"
+              />
+              <small className="field-hint">
+                Usa el total reportado para este día.
+              </small>
+            </label>
+            <label>
+              Efectivo contado (antes de salidas)
+              <input
+                defaultValue={initial.cash_total}
+                inputMode="decimal"
+                min="0"
+                name="cash_total"
+                placeholder="0.00"
+                required
+                step="0.01"
+                type="number"
+              />
+              <small className="field-hint">
+                Ingresa el efectivo físico antes de registrar las salidas.
+              </small>
+            </label>
+          </div>
+        </section>
 
-      <fieldset>
-        <legend>Desglose de Reporte Z por medio de pago</legend>
-        <p className="form-hint">
-          Este desglose concilia el Reporte Z; no se suma nuevamente a las ventas.
-        </p>
-        <div className="table-scroll">
-          <table className="closing-matrix">
-            <thead>
-              <tr>
-                <th scope="col">Tipo</th>
-                {closingPaymentChannels.map((channel) => (
-                  <th key={channel} scope="col">
-                    {closingPaymentChannelLabels[channel]}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {closingPaymentTypes.map((paymentType) => (
-                <tr key={paymentType}>
-                  <th scope="row">{closingPaymentTypeLabels[paymentType]}</th>
+        <fieldset className="closing-section closing-payments-section">
+          <legend>
+            <span className="closing-step">2</span>
+            Reporte Z: desglose de pagos
+          </legend>
+          <p className="form-hint">
+            Registra los importes por tipo de pago y canal. Este desglose se
+            concilia con las ventas; no lo sumes otra vez al total.
+          </p>
+          <div className="closing-payment-grid">
+            {closingPaymentTypes.map((paymentType) => (
+              <fieldset className="closing-payment-card" key={paymentType}>
+                <legend>{closingPaymentTypeLabels[paymentType]}</legend>
+                <div className="closing-payment-channels">
                   {closingPaymentChannels.map((channel) => (
-                    <td key={channel}>
+                    <label key={channel}>
+                      {closingPaymentChannelLabels[channel]}
                       <input
-                        aria-label={`${closingPaymentTypeLabels[paymentType]} - ${closingPaymentChannelLabels[channel]}`}
                         defaultValue={
                           paymentAmounts.get(`${paymentType}_${channel}`) ??
                           "0.00"
                         }
+                        inputMode="decimal"
                         min="0"
                         name={`payment_${paymentType}_${channel}`}
+                        placeholder="0.00"
                         required
                         step="0.01"
                         type="number"
                       />
-                    </td>
+                    </label>
                   ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </fieldset>
+                </div>
+              </fieldset>
+            ))}
+          </div>
+        </fieldset>
 
-      <fieldset>
-        <legend>Salidas de caja</legend>
-        <p className="form-hint">
-          Se guardan únicamente en este cierre; no crean gastos automáticamente.
-        </p>
-        <div className="table-scroll">
-          <table className="closing-entry-table">
-            <thead>
-              <tr>
-                <th scope="col">#</th>
-                <th scope="col">Descripción</th>
-                <th scope="col">Importe</th>
-              </tr>
-            </thead>
-            <tbody>
-              {initial.cashOutflows.map((outflow, index) => (
-                <tr key={index}>
-                  <th scope="row">{index + 1}</th>
-                  <td>
-                    <input
-                      aria-label={`Descripción de salida ${index + 1}`}
-                      defaultValue={outflow.description ?? ""}
-                      maxLength={200}
-                      name={`cash_outflow_${index + 1}_description`}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      aria-label={`Importe de salida ${index + 1}`}
-                      defaultValue={outflow.amount}
-                      min="0"
-                      name={`cash_outflow_${index + 1}_amount`}
-                      required
-                      step="0.01"
-                      type="number"
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </fieldset>
+        <fieldset className="closing-section">
+          <legend>
+            <span className="closing-step">3</span>
+            Salidas de caja
+          </legend>
+          <p className="form-hint">
+            Registra cada salida que se descuenta del efectivo y del Reporte Z.
+            No crea un gasto de proveedor automáticamente.
+          </p>
+          <div className="closing-outflow-grid">
+            {initial.cashOutflows.map((outflow, index) => (
+              <article className="closing-outflow-card" key={index}>
+                <h4>Salida {index + 1}</h4>
+                <label>
+                  Descripción
+                  <input
+                    defaultValue={outflow.description ?? ""}
+                    maxLength={200}
+                    name={`cash_outflow_${index + 1}_description`}
+                    placeholder="Ej.: compra o retiro de caja"
+                  />
+                </label>
+                <label>
+                  Importe
+                  <input
+                    defaultValue={outflow.amount}
+                    inputMode="decimal"
+                    min="0"
+                    name={`cash_outflow_${index + 1}_amount`}
+                    placeholder="0.00"
+                    required
+                    step="0.01"
+                    type="number"
+                  />
+                </label>
+              </article>
+            ))}
+          </div>
+        </fieldset>
 
-      <fieldset>
-        <legend>Propinas</legend>
-        <p className="form-hint">
-          Registra el total de propinas del día. Se informa por separado y no
-          afecta el Reporte Z ni el efectivo.
-        </p>
-        <label>
-          Propina total del día
+        <fieldset className="closing-section closing-tips-section">
+          <legend>
+            <span className="closing-step">4</span>
+            Propinas
+          </legend>
+          <p className="form-hint">
+            Registra el total del día. Las propinas se informan por separado y
+            no afectan el Reporte Z ni el efectivo.
+          </p>
+          <label>
+            Propina total del día
           <input
             aria-label="Propina total del día"
             defaultValue={initial.tips_total}
+            inputMode="decimal"
             min="0"
             name="tips_total"
+            placeholder="0.00"
             required
             step="0.01"
             type="number"
           />
-        </label>
-      </fieldset>
+          </label>
+        </fieldset>
 
-      <section aria-label="Totales calculados" className="closing-totals">
-        <article>
-          <h3>Reporte Z antes de gastos asignados</h3>
-          <p>{totals ? formatMoney(totals.reportedSalesTotal) : "—"}</p>
-          <span>Efectivo neto + banco + Pedidos Ya; propinas excluidas</span>
-        </article>
-        <article>
-          <h3>Total Banco</h3>
-          <p>{totals ? formatMoney(totals.bankTotal) : "—"}</p>
-          <span>Suma de las 10 celdas del desglose</span>
-        </article>
-        <article>
-          <h3>Efectivo después de salidas</h3>
-          <p>{totals ? formatMoney(totals.cashTotal) : "—"}</p>
-          <span>Importe contado menos las salidas de caja</span>
-        </article>
-        <article>
-          <h3>Salidas de caja</h3>
-          <p>{totals ? formatMoney(totals.cashOutflowTotal) : "—"}</p>
-          <span>Se restan del efectivo y del Reporte Z</span>
-        </article>
-        <article>
-          <h3>Propina del día</h3>
-          <p>{totals ? formatMoney(totals.tipsTotal) : "—"}</p>
-          <span>Se lleva por separado</span>
-        </article>
-      </section>
-      <label>
-        Notas
-        <textarea
-          defaultValue={initial.notes}
-          maxLength={2000}
-          name="notes"
-          rows={3}
-        />
-      </label>
-      {showCorrectionReason ? (
+        <section aria-label="Totales calculados" className="closing-totals">
+          <div className="closing-totals-heading">
+            <h3>Resumen calculado</h3>
+            <p>Se actualiza mientras completas el cierre.</p>
+          </div>
+          <article>
+            <h4>Ventas del Reporte Z</h4>
+            <p>{totals ? formatMoney(totals.reportedSalesTotal) : "—"}</p>
+            <span>
+              Efectivo neto + banco + Pedidos Ya; antes de gastos asignados
+            </span>
+          </article>
+          <article>
+            <h4>Pagos bancarios</h4>
+            <p>{totals ? formatMoney(totals.bankTotal) : "—"}</p>
+            <span>Suma del desglose por canal</span>
+          </article>
+          <article>
+            <h4>Efectivo neto</h4>
+            <p>{totals ? formatMoney(totals.cashTotal) : "—"}</p>
+            <span>Contado menos las salidas de caja</span>
+          </article>
+          <article>
+            <h4>Salidas de caja</h4>
+            <p>{totals ? formatMoney(totals.cashOutflowTotal) : "—"}</p>
+            <span>Se descuentan del efectivo y del Reporte Z</span>
+          </article>
+          <article>
+            <h4>Propinas</h4>
+            <p>{totals ? formatMoney(totals.tipsTotal) : "—"}</p>
+            <span>Informadas aparte; no afectan las ventas</span>
+          </article>
+        </section>
+        {!totals ? (
+          <p className="closing-totals-warning" role="status">
+            Verifica los importes y que las salidas no superen el efectivo
+            contado para poder ver el resumen.
+          </p>
+        ) : null}
         <label>
-          Motivo obligatorio de la corrección
+          Notas (opcional)
+          <textarea
+            defaultValue={initial.notes}
+            maxLength={2000}
+            name="notes"
+            placeholder="Agrega una observación útil para este cierre"
+            rows={3}
+          />
+        </label>
+        {showCorrectionReason ? (
+        <label>
+          Motivo de la corrección
           <textarea maxLength={500} name="correction_reason" rows={2} required />
+          <small className="field-hint">
+            Es obligatorio y quedará registrado en la auditoría.
+          </small>
         </label>
       ) : null}
       <div className="form-actions">
@@ -468,7 +502,7 @@ export function ClosingForm({
             {isSubmitting ? "Guardando…" : "Guardar corrección"}
           </button>
         )}
-      </div>
+        </div>
       </form>
       <dialog
         aria-describedby="closing-form-error-message"

@@ -39,11 +39,11 @@ export function BillVoidConfirmation({
       <dialog
         aria-describedby={descriptionId}
         aria-labelledby={titleId}
-        className="bill-void-dialog"
+        className="void-confirmation-dialog"
         onClose={() => setIsOpen(false)}
         ref={dialogRef}
       >
-        <div className="bill-void-dialog__heading">
+        <div className="void-confirmation-dialog__heading">
           <span aria-hidden="true">!</span>
           <div>
             <p className="eyebrow">Confirmación requerida</p>
@@ -54,7 +54,7 @@ export function BillVoidConfirmation({
           La factura quedará anulada y no podrá recibir pagos. Esta acción no se
           puede deshacer.
         </p>
-        <div className="bill-void-dialog__actions">
+        <div className="void-confirmation-dialog__actions">
           <button
             className="button-secondary"
             onClick={() => dialogRef.current?.close()}

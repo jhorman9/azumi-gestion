@@ -378,7 +378,7 @@ code {
   font-size: 0.74rem;
 }
 
-.bill-void-dialog {
+.void-confirmation-dialog {
   width: min(28rem, calc(100vw - 2rem));
   max-width: none;
   padding: 1.5rem;
@@ -389,18 +389,18 @@ code {
   box-shadow: 0 24px 80px rgb(24 22 21 / 24%);
 }
 
-.bill-void-dialog::backdrop {
+.void-confirmation-dialog::backdrop {
   background: rgb(24 22 21 / 56%);
   backdrop-filter: blur(3px);
 }
 
-.bill-void-dialog__heading {
+.void-confirmation-dialog__heading {
   display: flex;
   align-items: flex-start;
   gap: 0.9rem;
 }
 
-.bill-void-dialog__heading > span {
+.void-confirmation-dialog__heading > span {
   display: grid;
   flex: 0 0 2.5rem;
   width: 2.5rem;
@@ -413,23 +413,23 @@ code {
   font-weight: 800;
 }
 
-.bill-void-dialog .eyebrow {
+.void-confirmation-dialog .eyebrow {
   margin: 0 0 0.3rem;
 }
 
-.bill-void-dialog h2 {
+.void-confirmation-dialog h2 {
   margin: 0;
   font-size: 1.15rem;
 }
 
-.bill-void-dialog > p {
+.void-confirmation-dialog > p {
   margin: 1rem 0 0;
   color: var(--muted);
   font-size: 0.88rem;
   line-height: 1.55;
 }
 
-.bill-void-dialog__actions {
+.void-confirmation-dialog__actions {
   display: flex;
   justify-content: flex-end;
   flex-wrap: wrap;
@@ -437,7 +437,7 @@ code {
   margin-top: 1.5rem;
 }
 
-.bill-void-dialog__actions form {
+.void-confirmation-dialog__actions form {
   margin: 0;
 }
 
@@ -2275,9 +2275,205 @@ td a:hover,
   background: #fff;
 }
 
+.expenses-create-card > .form-hint {
+  max-width: 46rem;
+  margin: -0.5rem 0 1.25rem;
+}
+
+.expenses-history-card > .section-heading {
+  margin-bottom: 1.15rem;
+}
+
+.expense-list {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.expense-card {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+  padding: clamp(1rem, 2.5vw, 1.35rem);
+  border: 1px solid var(--line);
+  border-radius: 0.95rem;
+  background: #fff;
+  box-shadow: 0 3px 12px rgb(34 25 21 / 3%);
+}
+
+.expense-card-void {
+  background: #fbfaf9;
+}
+
+.expense-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.expense-card-title .eyebrow {
+  margin: 0 0 0.3rem;
+  font-size: 0.67rem;
+}
+
+.expense-card-title h3 {
+  margin: 0;
+  color: #292522;
+  font-size: 1.04rem;
+}
+
+.expense-card-title > p:last-child {
+  margin: 0.3rem 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.expense-card-amount {
+  display: grid;
+  justify-items: end;
+  gap: 0.28rem;
+}
+
+.expense-card-amount > span:first-child {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.expense-card-amount > strong {
+  color: var(--foreground);
+  font-size: 1.15rem;
+  letter-spacing: -0.02em;
+}
+
+.expense-status {
+  padding: 0.3rem 0.65rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.expense-status-paid {
+  border-color: #c5e1ce;
+  background: #eef8f0;
+  color: #2e7143;
+}
+
+.expense-status-void {
+  border-color: #e3dedb;
+  background: #f1efed;
+  color: #716b67;
+}
+
+.expense-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  gap: 0.65rem;
+  margin: 0;
+}
+
+.expense-details > div {
+  min-width: 0;
+  padding: 0.75rem;
+  border: 1px solid #f0edeb;
+  border-radius: 0.7rem;
+  background: #fbfaf9;
+}
+
+.expense-details dt {
+  margin-bottom: 0.3rem;
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.expense-details dd {
+  margin: 0;
+  color: #332d29;
+  font-size: 0.82rem;
+  font-weight: 620;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.expense-details .expense-audit dd {
+  font-weight: 400;
+}
+
+.expense-audit .audit-label {
+  min-width: 0;
+}
+
+.expense-actions {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  padding-top: 0.15rem;
+}
+
+.expense-edit {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.expense-edit > summary {
+  display: inline-flex;
+  align-items: center;
+  list-style: none;
+}
+
+.expense-edit > summary::-webkit-details-marker {
+  display: none;
+}
+
+.expense-edit[open] > summary {
+  margin-bottom: 0.15rem;
+}
+
+.expense-edit-form {
+  width: 100%;
+}
+
+.expense-edit-form > .form-hint {
+  margin: 0 0 0.35rem;
+}
+
+.expense-actions > form {
+  margin: 0;
+}
+
+.expense-create-card .checkbox-label {
+  align-items: flex-start;
+}
+
+.expense-create-card .checkbox-label > span {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.expense-create-card .checkbox-label strong {
+  font-size: 0.84rem;
+}
+
 .row-actions details > summary {
   color: var(--accent-dark);
   cursor: pointer;
   font-weight: 650;
   white-space: nowrap;
+}
+
+@media (max-width: 36rem) {
+  .expense-card-header {
+    flex-direction: column;
+  }
+
+  .expense-card-amount {
+    justify-items: start;
+  }
+
+  .expense-actions > form,
+  .expense-actions > form button,
+  .expense-edit > summary {
+    width: 100%;
+  }
 }
