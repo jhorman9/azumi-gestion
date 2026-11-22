@@ -378,6 +378,13 @@ code {
   font-size: 0.74rem;
 }
 
+.bill-management-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
 .void-confirmation-dialog {
   width: min(28rem, calc(100vw - 2rem));
   max-width: none;

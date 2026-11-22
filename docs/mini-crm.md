@@ -157,8 +157,10 @@ proveedor evita seleccionarlo para nuevos registros, sin eliminar su historial.
 El saldo se calcula como importe de la factura menos los pagos registrados. No
 se debe registrar el pago de una factura como un gasto adicional: el sistema
 informa por separado las obligaciones emitidas y los pagos a proveedores para
-evitar contar dos veces el mismo desembolso. Las facturas con pagos no se pueden
-anular; verifica los datos antes de crearla. Las listas están paginadas.
+evitar contar dos veces el mismo desembolso. Una factura abierta sin pagos se
+puede anular desde su ficha; las facturas con pagos registrados no se pueden
+anular para conservar la trazabilidad de esos desembolsos. Las listas están
+paginadas.
 
 ### Propinas — `/dashboard/tips`
 

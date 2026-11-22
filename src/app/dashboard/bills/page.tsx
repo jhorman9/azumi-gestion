@@ -415,19 +415,23 @@ export default async function BillsPage({ searchParams }: BillsPageProps) {
                               </label>
                               <div className="bill-payment-actions">
                                 <button type="submit">Registrar pago</button>
-                                {moneyToCents(bill.paid_total) ===
-                                BigInt(0) ? (
-                                  <BillVoidConfirmation
-                                    actionUrl={`/api/finance/bills/${encodeURIComponent(String(bill.id))}/status`}
-                                    billId={String(bill.id)}
-                                  />
-                                ) : (
-                                  <span className="bill-void-note">
-                                    No se puede anular porque ya tiene pagos.
-                                  </span>
-                                )}
                               </div>
                             </form>
+                          </div>
+                        ) : null}
+                        {bill.status === "open" ? (
+                          <div className="bill-management-actions">
+                            {moneyToCents(bill.paid_total) === BigInt(0) ? (
+                              <BillVoidConfirmation
+                                actionUrl={`/api/finance/bills/${encodeURIComponent(String(bill.id))}/status`}
+                                billId={String(bill.id)}
+                              />
+                            ) : (
+                              <span className="bill-void-note">
+                                No se puede anular: la factura ya tiene pagos
+                                registrados.
+                              </span>
+                            )}
                           </div>
                         ) : null}
                       </article>
