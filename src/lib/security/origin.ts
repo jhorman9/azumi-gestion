@@ -20,18 +20,17 @@ export function hasSameOrigin(request: Request): boolean {
 }
 
 export function getSameOriginUrl(request: Request, path: string): URL {
-  const origin = request.headers.get("origin");
-  if (!origin || !hasSameOrigin(request)) {
-    throw new Error("Cannot redirect a request without a validated origin.");
-  }
-
-  const originUrl = new URL(origin);
   const redirectOrigin =
     process.env.NODE_ENV === "production"
       ? productionOrigin
-      : originUrl.origin;
-  const destination = new URL(path, redirectOrigin);
-  if (destination.origin !== redirectOrigin) {
+      : request.headers.get("origin");
+  if (!redirectOrigin) {
+    throw new Error("Cannot build a redirect without an origin.");
+  }
+
+  const expectedOrigin = new URL(redirectOrigin).origin;
+  const destination = new URL(path, expectedOrigin);
+  if (destination.origin !== expectedOrigin) {
     throw new Error("Redirect destination must remain on the request origin.");
   }
 
