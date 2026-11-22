@@ -165,6 +165,72 @@ code {
   line-height: 1.5;
 }
 
+.form-error-dialog {
+  width: min(28rem, calc(100vw - 2rem));
+  max-width: none;
+  padding: 1.5rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: var(--surface);
+  color: var(--foreground);
+  box-shadow: 0 24px 80px rgb(24 22 21 / 24%);
+}
+
+.form-error-dialog::backdrop {
+  background: rgb(24 22 21 / 56%);
+  backdrop-filter: blur(3px);
+}
+
+.form-error-dialog__content {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.form-error-dialog__icon {
+  display: grid;
+  flex: 0 0 2.5rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.form-error-dialog .eyebrow {
+  margin: 0 0 0.3rem;
+}
+
+.form-error-dialog h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.form-error-dialog__content p:last-child {
+  margin: 0.65rem 0 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.form-error-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1.5rem;
+}
+
+.closing-detail-notes {
+  margin: 0.5rem 0 0;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: #faf9f8;
+  color: #58524f;
+  white-space: pre-wrap;
+}
+
 .dashboard-page {
   align-content: start;
   justify-items: center;
@@ -1321,6 +1387,39 @@ td a:hover,
   min-width: min(100%, 12rem);
 }
 
+.history-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.history-pagination > div {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.history-pagination .text-link,
+.history-pagination-disabled {
+  min-height: 2.5rem;
+  padding: 0.55rem 0.8rem;
+  font-size: 0.8rem;
+}
+
+.history-pagination-disabled {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+  color: #a39b96;
+}
+
 .row-actions {
   align-items: stretch;
   gap: 8px;
@@ -1631,6 +1730,15 @@ td a:hover,
   .dashboard-card {
     padding: 17px 15px;
     border-radius: 13px;
+  }
+
+  .history-pagination {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .history-pagination > div {
+    flex-wrap: wrap;
   }
 
   .metric-grid {

@@ -9,7 +9,9 @@ import { requirePermission } from "@/lib/auth/roles";
 import { getDbPool } from "@/lib/db";
 import {
   calculateClosingTotals,
+  closingPaymentChannelLabels,
   closingPaymentChannels,
+  closingPaymentTypeLabels,
   closingPaymentTypes,
   cashOutflowSlots,
   type ClosingFormDefaults,
@@ -259,6 +261,9 @@ export default async function ClosingDetailPage({
   const cashOutflowTotal = sumMoney(
     cashOutflows.map((outflow) => outflow.amount),
   );
+  const bankTotal = sumMoney(
+    channelPayments.map((payment) => payment.amount),
+  );
   const expenseDeductionTotal = sumMoney(
     expenseDeductions.map((expense) => expense.amount),
   );
@@ -357,6 +362,63 @@ export default async function ClosingDetailPage({
         ) : null}
 
         <section className="dashboard-card">
+          <h2>Detalle del cierre</h2>
+          <div className="closing-totals">
+            <article>
+              <h3>Reporte Z original</h3>
+              <p>{formatMoney(closing.gross_reported_sales_total)}</p>
+            </article>
+            <article>
+              <h3>Efectivo contado</h3>
+              <p>{formatMoney(closing.gross_cash_total)}</p>
+            </article>
+            <article>
+              <h3>Total banco</h3>
+              <p>{formatMoney(bankTotal)}</p>
+            </article>
+            <article>
+              <h3>Pedidos Ya</h3>
+              <p>{formatMoney(closing.pedidos_ya_total)}</p>
+            </article>
+          </div>
+          <h3>Desglose de pagos bancarios</h3>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Tipo de pago</th>
+                  <th scope="col">Canal</th>
+                  <th scope="col">Importe</th>
+                </tr>
+              </thead>
+              <tbody>
+                {closingPaymentTypes.flatMap((paymentType) =>
+                  closingPaymentChannels.map((paymentChannel) => (
+                    <tr key={`${paymentType}-${paymentChannel}`}>
+                      <td>{closingPaymentTypeLabels[paymentType]}</td>
+                      <td>
+                        {closingPaymentChannelLabels[paymentChannel]}
+                      </td>
+                      <td>
+                        {formatMoney(
+                          paymentAmounts.get(
+                            `${paymentType}_${paymentChannel}`,
+                          ) ?? "0.00",
+                        )}
+                      </td>
+                    </tr>
+                  )),
+                )}
+              </tbody>
+            </table>
+          </div>
+          <h3>Notas del cierre</h3>
+          <p className="closing-detail-notes">
+            {closing.notes?.trim() || "Sin notas registradas."}
+          </p>
+        </section>
+
+        <section className="dashboard-card">
           <h2>Salidas y gastos descontados</h2>
           <p className="form-hint">
             Las salidas de caja y los gastos asignados se restan del efectivo y
@@ -395,6 +457,31 @@ export default async function ClosingDetailPage({
               <span>Seguimiento separado del Reporte Z</span>
             </article>
           </div>
+          <h3>Detalle de salidas de caja</h3>
+          {cashOutflows.length === 0 ? (
+            <p className="empty-state">No hay salidas de caja registradas.</p>
+          ) : (
+            <div className="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">N.º</th>
+                    <th scope="col">Descripción</th>
+                    <th scope="col">Importe</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cashOutflows.map((outflow) => (
+                    <tr key={outflow.line_number}>
+                      <td>{outflow.line_number}</td>
+                      <td>{outflow.description}</td>
+                      <td>{formatMoney(outflow.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
           {expenseDeductions.length === 0 ? (
             <p className="empty-state">
               No hay gastos asignados a la fecha de este cierre.

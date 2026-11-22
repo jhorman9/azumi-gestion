@@ -27,12 +27,22 @@ interface ClosingRow extends RowDataPacket {
   status: "draft" | "confirmed" | "corrected";
 }
 
+interface ClosingCountRow extends RowDataPacket {
+  total: number | string;
+}
+
 interface ClosingsPageProps {
   searchParams: Promise<{
     created?: string | string[];
     error?: string | string[];
+    month?: string | string[];
+    from?: string | string[];
+    to?: string | string[];
+    page?: string | string[];
   }>;
 }
+
+const pageSize = 10;
 
 const errorMessages: Record<string, string> = {
   invalid: "Revisa los datos del cierre.",
@@ -54,34 +64,98 @@ function firstValue(value?: string | string[]): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
+function isValidMonth(value: string): boolean {
+  return /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
+}
+
+function isValidBusinessDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  );
+}
+
+function monthStartDate(month: string): string {
+  return `${month}-01`;
+}
+
+function monthEndDate(month: string): string {
+  const [year, monthNumber] = month.split("-").map(Number);
+  return new Date(Date.UTC(year, monthNumber, 0)).toISOString().slice(0, 10);
+}
+
 export default async function ClosingsPage({
   searchParams,
 }: ClosingsPageProps) {
   await connection();
   const user = await requirePermission("closings:read");
+  const params = await searchParams;
+  const today = todayInPanama();
+  const requestedMonth = firstValue(params.month);
+  const month =
+    requestedMonth && isValidMonth(requestedMonth)
+      ? requestedMonth
+      : today.slice(0, 7);
+  let from = firstValue(params.from) ?? "";
+  let to = firstValue(params.to) ?? "";
+
+  if (!isValidBusinessDate(from) || !from.startsWith(month)) {
+    from = "";
+  }
+  if (!isValidBusinessDate(to) || !to.startsWith(month)) {
+    to = "";
+  }
+  if (from && to && from > to) {
+    from = "";
+    to = "";
+  }
+
+  const startDate = from || monthStartDate(month);
+  const endDate = to || monthEndDate(month);
+  const [countRows] = await getDbPool().execute<ClosingCountRow[]>(
+    `SELECT COUNT(*) AS total
+     FROM daily_closings
+     WHERE operation_date BETWEEN ? AND ?`,
+    [startDate, endDate],
+  );
+  const totalRows = Number(countRows[0]?.total ?? 0);
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+  const requestedPage = Number(firstValue(params.page) ?? "1");
+  const page =
+    Number.isSafeInteger(requestedPage) && requestedPage > 0
+      ? Math.min(requestedPage, totalPages)
+      : 1;
+  const offset = (page - 1) * pageSize;
   const [closings] = await getDbPool().execute<ClosingRow[]>(
     `SELECT c.id, DATE_FORMAT(c.operation_date, '%Y-%m-%d') AS operation_date,
             c.reported_sales_total, c.pedidos_ya_total, c.cash_total,
-          COALESCE((
-            SELECT SUM(o.amount)
-            FROM daily_closing_cash_outflows o
-            WHERE o.daily_closing_id = c.id
-          ), 0.00) AS cash_outflow_total,
-          COALESCE((
-            SELECT SUM(e.amount)
-            FROM expenses e
-            WHERE e.closing_operation_date = c.operation_date
-              AND e.deduct_from_closing = 1
-              AND e.status = 'paid'
-          ), 0.00) AS expense_deduction_total,
+            COALESCE((
+              SELECT SUM(o.amount)
+              FROM daily_closing_cash_outflows o
+              WHERE o.daily_closing_id = c.id
+            ), 0.00) AS cash_outflow_total,
+            COALESCE((
+              SELECT SUM(e.amount)
+              FROM expenses e
+              WHERE e.closing_operation_date = c.operation_date
+                AND e.deduct_from_closing = 1
+                AND e.status = 'paid'
+            ), 0.00) AS expense_deduction_total,
             COALESCE((
               SELECT SUM(p.amount)
               FROM daily_closing_channel_payments p
               WHERE p.daily_closing_id = c.id
             ), 0.00) AS bank_total,
-          a.action AS last_action,
-          au.name AS last_actor_name,
-          DATE_FORMAT(a.created_at, '%Y-%m-%dT%H:%i:%sZ') AS last_action_at,
+            a.action AS last_action,
+            au.name AS last_actor_name,
+            DATE_FORMAT(a.created_at, '%Y-%m-%dT%H:%i:%sZ') AS last_action_at,
             c.status
      FROM daily_closings c
      LEFT JOIN (
@@ -92,12 +166,25 @@ export default async function ClosingsPage({
      ) latest ON latest.entity_id = CAST(c.id AS CHAR)
      LEFT JOIN audit_logs a ON a.id = latest.audit_id
      LEFT JOIN users au ON au.id = a.actor_user_id
-     ORDER BY c.operation_date DESC
-     LIMIT 90`,
+     WHERE c.operation_date BETWEEN ? AND ?
+     ORDER BY c.operation_date DESC, c.id DESC
+     LIMIT ? OFFSET ?`,
+    [startDate, endDate, pageSize, offset],
   );
-  const params = await searchParams;
   const error = firstValue(params.error);
   const created = firstValue(params.created);
+  const paginationQuery = new URLSearchParams({ month });
+  if (from) {
+    paginationQuery.set("from", from);
+  }
+  if (to) {
+    paginationQuery.set("to", to);
+  }
+  const pageHref = (nextPage: number) => {
+    const query = new URLSearchParams(paginationQuery);
+    query.set("page", String(nextPage));
+    return `/dashboard/closings?${query.toString()}`;
+  };
 
   return (
     <main className="dashboard-page">
@@ -139,9 +226,30 @@ export default async function ClosingsPage({
         </section>
 
         <section className="dashboard-card">
-          <h2>Historial reciente</h2>
+          <h2>Historial de cierres</h2>
+          <form action="/dashboard/closings" className="inline-form" method="get">
+            <label>
+              Mes
+              <input defaultValue={month} name="month" required type="month" />
+            </label>
+            <label>
+              Desde el día
+              <input defaultValue={from} name="from" type="date" />
+            </label>
+            <label>
+              Hasta el día
+              <input defaultValue={to} name="to" type="date" />
+            </label>
+            <button type="submit">Filtrar historial</button>
+          </form>
+          <p className="form-hint">
+            Selecciona un mes completo o limita los resultados a días de ese
+            mes. Se muestran 10 cierres por página.
+          </p>
           {closings.length === 0 ? (
-            <p className="empty-state">Todavía no hay cierres registrados.</p>
+            <p className="empty-state">
+              No hay cierres para los filtros seleccionados.
+            </p>
           ) : (
             <div className="table-scroll">
               <table>
@@ -178,8 +286,11 @@ export default async function ClosingsPage({
                         />
                       </td>
                       <td>
-                        <Link href={`/dashboard/closings/${closing.id}`}>
-                          Abrir cierre
+                        <Link
+                          className="button-secondary text-link"
+                          href={`/dashboard/closings/${closing.id}`}
+                        >
+                          Ver detalle
                         </Link>
                       </td>
                     </tr>
@@ -188,6 +299,44 @@ export default async function ClosingsPage({
               </table>
             </div>
           )}
+          <nav aria-label="Paginación del historial" className="history-pagination">
+            <span>
+              {totalRows === 0
+                ? "0 cierres"
+                : `${offset + 1}–${Math.min(offset + pageSize, totalRows)} de ${totalRows} cierres`}
+            </span>
+            <div>
+              {page > 1 ? (
+                <Link
+                  aria-label="Página anterior"
+                  className="button-secondary text-link"
+                  href={pageHref(page - 1)}
+                >
+                  Anterior
+                </Link>
+              ) : (
+                <span aria-disabled="true" className="history-pagination-disabled">
+                  Anterior
+                </span>
+              )}
+              <span>
+                Página {page} de {totalPages}
+              </span>
+              {page < totalPages ? (
+                <Link
+                  aria-label="Página siguiente"
+                  className="button-secondary text-link"
+                  href={pageHref(page + 1)}
+                >
+                  Siguiente
+                </Link>
+              ) : (
+                <span aria-disabled="true" className="history-pagination-disabled">
+                  Siguiente
+                </span>
+              )}
+            </div>
+          </nav>
         </section>
       </div>
     </main>
