@@ -399,17 +399,16 @@ export function ClosingForm({
           </p>
           <label>
             Propina total del día
-          <input
-            aria-label="Propina total del día"
-            defaultValue={initial.tips_total}
-            inputMode="decimal"
-            min="0"
-            name="tips_total"
-            placeholder="0.00"
-            required
-            step="0.01"
-            type="number"
-          />
+            <input
+              defaultValue={initial.tips_total}
+              inputMode="decimal"
+              min="0"
+              name="tips_total"
+              placeholder="0.00"
+              required
+              step="0.01"
+              type="number"
+            />
           </label>
         </fieldset>
 
@@ -447,9 +446,9 @@ export function ClosingForm({
           </article>
         </section>
         {!totals ? (
-          <p className="closing-totals-warning" role="status">
-            Verifica los importes y que las salidas no superen el efectivo
-            contado para poder ver el resumen.
+          <p className="closing-totals-warning">
+            El resumen aparecerá cuando los importes sean válidos y las salidas
+            no superen el efectivo contado.
           </p>
         ) : null}
         <label>
@@ -463,45 +462,51 @@ export function ClosingForm({
           />
         </label>
         {showCorrectionReason ? (
-        <label>
-          Motivo de la corrección
-          <textarea maxLength={500} name="correction_reason" rows={2} required />
-          <small className="field-hint">
-            Es obligatorio y quedará registrado en la auditoría.
-          </small>
-        </label>
-      ) : null}
-      <div className="form-actions">
-        {isDraft ? (
-          <>
+          <label>
+            Motivo de la corrección
+            <textarea
+              maxLength={500}
+              name="correction_reason"
+              placeholder="Describe qué se corrigió y por qué"
+              required
+              rows={2}
+            />
+            <small className="field-hint">
+              Es obligatorio y quedará registrado en la auditoría.
+            </small>
+          </label>
+        ) : null}
+        <div className="form-actions">
+          {isDraft ? (
+            <>
+              <button
+                name="action"
+                type="submit"
+                value="save"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Guardando…" : "Guardar borrador"}
+              </button>
+              <button
+                className="button-secondary"
+                name="action"
+                type="submit"
+                value="confirm"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Guardando…" : "Confirmar cierre"}
+              </button>
+            </>
+          ) : (
             <button
               name="action"
               type="submit"
-              value="save"
+              value="correct"
               disabled={isSubmitting}
             >
-              {isSubmitting ? "Guardando…" : "Guardar borrador"}
+              {isSubmitting ? "Guardando…" : "Guardar corrección"}
             </button>
-            <button
-              className="button-secondary"
-              name="action"
-              type="submit"
-              value="confirm"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? "Guardando…" : "Confirmar cierre"}
-            </button>
-          </>
-        ) : (
-          <button
-            name="action"
-            type="submit"
-            value="correct"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? "Guardando…" : "Guardar corrección"}
-          </button>
-        )}
+          )}
         </div>
       </form>
       <dialog

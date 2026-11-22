@@ -4,6 +4,7 @@ import {
   Store,
 } from "lucide-react";
 import { SidebarLink } from "@/app/components/sidebar-link";
+import { SidebarToggle } from "@/app/components/sidebar-toggle";
 import { hasPermission } from "@/lib/auth/roles";
 import type { SessionUser } from "@/lib/auth/session";
 
@@ -21,7 +22,7 @@ export function ManagerNav({
 
   return (
     <>
-      <aside className="manager-sidebar">
+      <aside className="manager-sidebar" id="manager-sidebar">
         <div className="sidebar-brand">
           <span aria-hidden="true" className="sidebar-brand-mark">
             <CookingPot size={22} strokeWidth={1.8} />
@@ -128,10 +129,15 @@ export function ManagerNav({
       </aside>
 
       <header className="manager-topbar">
-        <div className="topbar-context">
-          <span>Azumi</span>
-          <span aria-hidden="true">/</span>
-          <strong>{previewMode ? "Vista de diseño" : "Centro de gestión"}</strong>
+        <div className="topbar-leading">
+          <SidebarToggle />
+          <div className="topbar-context">
+            <span>Azumi</span>
+            <span aria-hidden="true">/</span>
+            <strong>
+              {previewMode ? "Vista de diseño" : "Centro de gestión"}
+            </strong>
+          </div>
         </div>
         <div className="topbar-status">
           <span aria-hidden="true" className="status-dot" />

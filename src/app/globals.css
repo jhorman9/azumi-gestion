@@ -748,6 +748,22 @@ code {
   gap: 0.8rem;
 }
 
+.closing-totals-heading {
+  grid-column: 1 / -1;
+}
+
+.closing-totals-heading h3 {
+  margin: 0;
+  color: #302a27;
+  font-size: 1rem;
+}
+
+.closing-totals-heading p {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
 .closing-totals article {
   padding: 1rem;
   border: 1px solid #e3e6ec;
@@ -755,13 +771,14 @@ code {
   background: #f8f9fc;
 }
 
-.closing-totals h3 {
+.closing-totals article h4 {
   margin: 0 0 0.4rem;
   color: var(--muted);
   font-size: 0.9rem;
+  font-weight: 650;
 }
 
-.closing-totals p {
+.closing-totals article > p {
   margin: 0;
   font-size: 1.35rem;
   font-weight: 700;
@@ -772,6 +789,141 @@ code {
   margin-top: 0.35rem;
   color: var(--muted);
   font-size: 0.8rem;
+}
+
+.closing-totals-warning {
+  margin: -0.5rem 0 0;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid #edc8c9;
+  border-radius: 0.65rem;
+  background: #fff4f3;
+  color: #9e272c;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.closing-form {
+  gap: 1.25rem;
+}
+
+.closing-section {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+  margin: 0;
+  padding: 1.1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  background: #fff;
+}
+
+.closing-section > legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  max-width: 100%;
+  padding: 0 0.45rem;
+  color: #302a27;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.closing-section-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.closing-section-heading h3 {
+  margin: 0;
+  color: #302a27;
+  font-size: 0.94rem;
+}
+
+.closing-section-heading p {
+  margin: 0.2rem 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.closing-step {
+  display: inline-grid;
+  flex: 0 0 1.65rem;
+  width: 1.65rem;
+  height: 1.65rem;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  font-size: 0.73rem;
+  font-weight: 750;
+}
+
+.closing-payment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: 0.85rem;
+}
+
+.finance-form fieldset.closing-payment-card {
+  gap: 0.8rem;
+  padding: 0.9rem;
+  border-color: #efebe8;
+  border-radius: 0.75rem;
+  background: #fbfaf9;
+}
+
+.closing-payment-card > legend {
+  padding: 0 0.35rem;
+  color: #494440;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.closing-payment-channels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.5rem), 1fr));
+  gap: 0.7rem;
+}
+
+.closing-payment-channels label {
+  min-width: 0;
+}
+
+.closing-outflow-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+  gap: 0.75rem;
+}
+
+.closing-outflow-card {
+  display: grid;
+  align-content: start;
+  gap: 0.7rem;
+  min-width: 0;
+  padding: 0.85rem;
+  border: 1px solid #efebe8;
+  border-radius: 0.75rem;
+  background: #fbfaf9;
+}
+
+.closing-outflow-card h4 {
+  margin: 0;
+  color: #494440;
+  font-size: 0.76rem;
+}
+
+.closing-outflow-card label {
+  min-width: 0;
+}
+
+.closing-tips-section > label {
+  max-width: 22rem;
+}
+
+.closing-form .field-hint {
+  font-size: 0.72rem;
 }
 
 .adjustment-grid {
@@ -875,6 +1027,7 @@ th {
   background:
     radial-gradient(ellipse at 75% -15%, rgb(189 36 43 / 4%), transparent 32rem),
     var(--background);
+  transition: grid-template-columns 180ms ease;
 }
 
 .manager-sidebar {
@@ -1110,8 +1263,39 @@ th {
   backdrop-filter: blur(16px);
 }
 
+.topbar-leading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: clamp(0.65rem, 1.5vw, 1rem);
+}
+
+.sidebar-toggle {
+  display: grid;
+  flex: 0 0 2.4rem;
+  width: 2.4rem;
+  min-height: 2.4rem;
+  place-items: center;
+  padding: 0;
+  border: 1px solid #e8e5e1;
+  border-radius: 0.7rem;
+  background: #fff;
+  color: #514a46;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    color 150ms ease;
+}
+
+.sidebar-toggle:hover {
+  border-color: #d7ceca;
+  background: #f8f6f5;
+  color: var(--accent-dark);
+}
+
 .topbar-context {
   display: flex;
+  min-width: 0;
   align-items: center;
   gap: 10px;
   color: #9a928d;
@@ -1119,8 +1303,11 @@ th {
 }
 
 .topbar-context strong {
+  overflow: hidden;
   color: var(--foreground);
   font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .topbar-status {
@@ -1142,6 +1329,14 @@ th {
   border-radius: 50%;
   background: #39a56a;
   box-shadow: 0 0 0 3px rgb(57 165 106 / 12%);
+}
+
+:root[data-sidebar-collapsed="true"] .manager-sidebar {
+  display: none;
+}
+
+:root[data-sidebar-collapsed="true"] .dashboard-page {
+  grid-template-columns: 0 minmax(0, 1fr);
 }
 
 .dashboard-page > .page-content {
@@ -1505,9 +1700,7 @@ button:disabled {
 .inline-form input,
 .inline-form select,
 .row-actions input,
-.row-actions select,
-.closing-matrix input,
-.closing-entry-table input {
+.row-actions select {
   min-height: 42px;
   border: 1px solid #e3dedb;
   border-radius: 9px;
@@ -1532,6 +1725,11 @@ button:disabled {
   border-color: #cfc6c1;
 }
 
+.closing-matrix input:hover,
+.closing-entry-table input:hover {
+  border-color: #cfc6c1;
+}
+
 .finance-form input:focus,
 .finance-form select:focus,
 .finance-form textarea:focus,
@@ -1540,7 +1738,12 @@ button:disabled {
 .inline-form input:focus,
 .inline-form select:focus,
 .row-actions input:focus,
-.row-actions select:focus,
+.row-actions select:focus {
+  border-color: #cb555a;
+  outline: 0;
+  box-shadow: 0 0 0 3px rgb(189 36 43 / 11%);
+}
+
 .closing-matrix input:focus,
 .closing-entry-table input:focus {
   border-color: #cb555a;
@@ -2040,6 +2243,21 @@ td a:hover,
     padding: 0 20px;
   }
 
+  :root[data-sidebar-collapsed="true"] .dashboard-page {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 58px minmax(0, 1fr);
+  }
+
+  :root[data-sidebar-collapsed="true"] .manager-topbar {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  :root[data-sidebar-collapsed="true"] .dashboard-page > .page-content {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
   .dashboard-page > .page-content {
     grid-column: 1;
     grid-row: 3;
@@ -2064,6 +2282,16 @@ td a:hover,
   .topbar-context {
     gap: 7px;
     font-size: 0.71rem;
+  }
+
+  .topbar-leading {
+    gap: 0.55rem;
+  }
+
+  .sidebar-toggle {
+    flex-basis: 2.2rem;
+    width: 2.2rem;
+    min-height: 2.2rem;
   }
 
   .topbar-status {
