@@ -16,28 +16,49 @@ accesible desde el servidor de desarrollo.
 
 1. Instala dependencias: `npm install`
 2. Copia `.env.example` a `.env` y configura la conexión MySQL.
-3. Aplica en orden las migraciones de `database/migrations/` desde phpMyAdmin.
-4. Crea la primera cuenta administradora con `npm run admin:create` desde una
+3. Genera un valor aleatorio para `SESSION_SECRET` en PowerShell:
+
+   ```powershell
+   $bytes = New-Object byte[] 48
+   $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+   $rng.GetBytes($bytes)
+   [Convert]::ToBase64String($bytes)
+   $rng.Dispose()
+   ```
+
+   Copia el resultado en `.env`, reemplazando el marcador:
+   `SESSION_SECRET=valor_generado`. No agregues comillas ni compartas el valor.
+   Reinicia el servidor si ya estaba iniciado. En producción, configura un
+   secreto distinto en las variables de entorno del proveedor; no subas `.env`
+   a Git. Cambiarlo invalida las sesiones existentes.
+4. Aplica en orden las migraciones de `database/migrations/` desde phpMyAdmin.
+5. Crea la primera cuenta administradora con `npm run admin:create` desde una
    terminal interactiva y con `.env` configurado.
-5. Inicia el servidor: `npm run dev` y entra en `/login`.
+6. Inicia el servidor: `npm run dev` y entra en `/login`.
 
 Scripts disponibles: `npm run dev`, `npm run build`, `npm run lint`,
 `npm run typecheck` y `npm run admin:create`.
+
+## Documentación
+
+- [Manual completo del Mini CRM](./docs/mini-crm.md): módulos, reglas
+  financieras, procedimientos de uso, instalación, despliegue y resolución de
+  problemas.
+- [Arquitectura y plan inicial](./docs/architecture.md): contexto técnico e
+  histórico; para el comportamiento vigente, consulta el manual completo.
 
 ## Decisiones y alcance
 
 - Next.js App Router, TypeScript estricto, CSS estándar y MySQL/MariaDB mediante
   `mysql2/promise`; no se usa ORM.
-- La autenticación y autorización se implementarán en el servidor. No habrá
-  registro público.
+- La autenticación y autorización se validan en el servidor. No hay registro
+  público.
 - La aplicación administra una sola empresa. El POS y la web pública del menú
   permanecen externos y no se sincronizan automáticamente.
-- No existe registro público. El primer administrador se crea por CLI; luego
-  los administradores gestionan usuarios desde el panel.
-- La arquitectura, el plan por fases y las decisiones contables están en
-  [`docs/architecture.md`](./docs/architecture.md).
-- Las migraciones SQL se versionarán en `database/migrations/` y se ejecutarán
-  desde phpMyAdmin después de validar la versión MySQL disponible.
+- El primer administrador se crea por CLI; luego los administradores gestionan
+  usuarios desde el panel.
+- Las migraciones SQL están versionadas en `database/migrations/` y deben
+  aplicarse en orden a la base de datos.
 
 ## Despliegue
 
