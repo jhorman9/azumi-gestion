@@ -175,6 +175,22 @@ administrador y activar o desactivar usuarios. No se puede desactivar la cuenta
 del administrador que está usando el panel; conserva siempre una cuenta
 administradora activa.
 
+### Cotizaciones — `/dashboard/quotations`
+
+La plantilla muestra los datos fijos de Restaurante Azumi Bistro Inc. y genera
+un número anual consecutivo (`COT-AAAA-00001`). El CRM conserva únicamente el
+contador por año para evitar números duplicados; no guarda clientes ni
+cotizaciones.
+
+Completa los datos del cliente, elige la fecha hasta la que será válida y añade
+uno o más conceptos con cantidad y precio unitario. El importe de cada línea,
+subtotal, ITBMS del 7% y total se calculan automáticamente usando aritmética
+decimal exacta. La dirección del cliente es opcional; los demás datos del
+cliente son requeridos. Usa **Descargar PDF limpio** para generar un archivo
+listo para imprimir, sin la dirección ni el encabezado del navegador. Si
+necesitas modificarlo luego, genera otra cotización; el documento anterior no
+se conserva en el sistema.
+
 ## 4. Reglas contables importantes
 
 - Los cierres en borrador no forman parte del Dashboard ni de los informes de
@@ -271,6 +287,7 @@ Ejecuta los archivos SQL en orden numérico:
 | `004_provider_expenses_and_cash_deductions.sql` | Gastos vinculados a proveedores y descuentos de cierres. |
 | `005_retire_menu_editor_accounts.sql` | Desactiva las cuentas del rol de editor de menú retirado. |
 | `006_closing_outflows_and_daily_tips.sql` | Total diario de propinas y ajuste auditado de salidas de caja existentes cuando es aplicable. |
+| `007_quotation_number_sequences.sql` | Contador anual para números de cotización; no guarda cotizaciones. |
 
 Las migraciones son incrementales; no elimines ni modifiques registros de
 `schema_migrations` manualmente para forzar una ejecución.
@@ -328,6 +345,7 @@ la sesión y el permiso correspondiente. Las rutas que modifican datos aceptan
 | `/dashboard/tips` | Consulta de propinas. |
 | `/dashboard/reports` | Informes por rango. |
 | `/dashboard/audit` | Auditoría. |
+| `/dashboard/quotations` | Plantilla imprimible de cotizaciones (requiere `finance:write`). |
 | `/admin/users` | Gestión de usuarios (administrador). |
 
 | Endpoint `POST` | Función |
@@ -338,6 +356,7 @@ la sesión y el permiso correspondiente. Las rutas que modifican datos aceptan
 | `/api/finance/expenses`, `/api/finance/expenses/[id]`, `/api/finance/expenses/[id]/status` | Crear, editar y anular gastos. |
 | `/api/finance/suppliers`, `/api/finance/suppliers/[id]/status` | Crear y activar/desactivar proveedores. |
 | `/api/finance/bills`, `/api/finance/bills/[id]/status`, `/api/finance/bills/[id]/payments` | Crear/anular facturas y registrar pagos. |
+| `/api/finance/quotations/next-number` | Asignar un número anual consecutivo; guarda solo el contador. |
 
 ### Datos principales
 
@@ -362,6 +381,8 @@ migraciones SQL definen la evolución del esquema.
 ## 9. Límites funcionales actuales
 
 - No hay registro público de usuarios ni recuperación automática de contraseña.
+- Las cotizaciones se imprimen o guardan como PDF desde el navegador, pero el
+  CRM solo conserva su contador anual, no el documento ni sus datos.
 - No hay sincronización automática con el POS, pedidos, inventario ni menú
   público.
 - El Dashboard y los informes comparan métricas financieras, pero no calculan

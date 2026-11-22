@@ -77,6 +77,9 @@ export function ManagerNav({
               <SidebarLink href="/dashboard/reports" icon="reports">
                 Informes
               </SidebarLink>
+              <SidebarLink href="/dashboard/quotations" icon="quotations">
+                Cotizaciones
+              </SidebarLink>
               <SidebarLink href="/dashboard/tips" icon="tips">
                 Propinas
               </SidebarLink>

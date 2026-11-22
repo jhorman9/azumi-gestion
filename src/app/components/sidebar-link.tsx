@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   ChartNoAxesCombined,
   ClipboardCheck,
+  FileText,
   HandCoins,
   History,
   LayoutDashboard,
@@ -21,6 +22,7 @@ const icons = {
   suppliers: Truck,
   bills: WalletCards,
   reports: ChartNoAxesCombined,
+  quotations: FileText,
   tips: HandCoins,
   users: Users,
   audit: History,

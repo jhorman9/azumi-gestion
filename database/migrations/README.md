@@ -37,6 +37,10 @@ anteriores con salidas mayores que el efectivo se conservan para revisión y
 corrección manual. Las filas históricas de propinas por persona se conservan,
 pero la aplicación ya no las consulta ni agrega nuevas.
 
+`007_quotation_number_sequences.sql` crea un consecutivo anual para cotizaciones.
+Solo guarda el contador; no almacena los datos de clientes, conceptos ni
+importes del documento.
+
 Selecciona la base correcta en phpMyAdmin, revisa el script y ejecútalo una
 sola vez y en orden. Cada script registra su versión en `schema_migrations`.
 La aplicación no ejecuta migraciones al iniciar. Después, ejecuta
