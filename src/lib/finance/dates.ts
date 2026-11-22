@@ -57,6 +57,46 @@ export function formatDateTimeInPanama(value: string | null): string {
   }).format(date);
 }
 
+export function isValidBusinessMonth(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})$/.exec(value);
+  if (!match) {
+    return false;
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  return year >= 1000 && month >= 1 && month <= 12;
+}
+
+export function businessMonthRange(month: string): DateRange {
+  if (!isValidBusinessMonth(month)) {
+    throw new Error("Invalid business month.");
+  }
+
+  const [year, monthNumber] = month.split("-").map(Number);
+  const start = `${month}-01`;
+  const end = new Date(Date.UTC(year, monthNumber, 0))
+    .toISOString()
+    .slice(0, 10);
+  return { start, end };
+}
+
+export function isValidBusinessYear(value: string): boolean {
+  const year = Number(value);
+  return /^\d{4}$/.test(value) && year >= 1000 && year <= 9998;
+}
+
+export function businessYearRange(year: string): DateRange {
+  if (!isValidBusinessYear(year)) {
+    throw new Error("Invalid business year.");
+  }
+
+  return {
+    start: `${year}-01-01`,
+    end: `${year}-12-31`,
+  };
+}
+
 export function currentMonthInPanama(now = new Date()): DateRange {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Panama",
@@ -65,10 +105,7 @@ export function currentMonthInPanama(now = new Date()): DateRange {
   }).formatToParts(now);
   const year = Number(parts.find((item) => item.type === "year")?.value);
   const month = Number(parts.find((item) => item.type === "month")?.value);
-  const start = `${year}-${String(month).padStart(2, "0")}-01`;
-  const endDate = new Date(Date.UTC(year, month, 0));
-  const end = endDate.toISOString().slice(0, 10);
-  return { start, end };
+  return businessMonthRange(`${year}-${String(month).padStart(2, "0")}`);
 }
 
 export function nextBusinessDate(value: string): string {
