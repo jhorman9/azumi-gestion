@@ -12,12 +12,12 @@ import {
   closingPaymentChannels,
   closingPaymentTypes,
   cashOutflowSlots,
-  tipSlots,
   type ClosingFormDefaults,
 } from "@/lib/finance/closing";
 import {
   expensePaymentMethodLabels,
   formatMoney,
+  moneyToCents,
   sumMoney,
 } from "@/lib/finance/money";
 import {
@@ -37,6 +37,7 @@ interface ClosingRow extends RowDataPacket {
   pedidos_ya_total: string;
   cash_total: string;
   gross_cash_total: string;
+  tips_total: string;
   status: "draft" | "confirmed" | "corrected";
   notes: string | null;
   created_by_name: string;
@@ -51,12 +52,6 @@ interface ChannelPaymentRow extends RowDataPacket {
 interface CashOutflowRow extends RowDataPacket {
   line_number: number;
   description: string;
-  amount: string;
-}
-
-interface TipRow extends RowDataPacket {
-  line_number: number;
-  recipient_name: string;
   amount: string;
 }
 
@@ -102,7 +97,11 @@ const errorMessages: Record<string, string> = {
   duplicate: "Ya existe otro cierre para esa fecha.",
   locked: "El estado del cierre cambió. Recarga la página para continuar.",
   "deduction-exceeds-cash":
-    "Los gastos descontados superan el efectivo registrado para este cierre.",
+    "Las salidas de caja y los gastos descontados superan el efectivo contado.",
+  "outflow-exceeds-cash":
+    "Las salidas de caja no pueden superar el efectivo contado.",
+  "outflow-invalid":
+    "Completa cada salida y verifica que su suma no supere el efectivo contado.",
   "expenses-assigned":
     "Este cierre tiene gastos asignados. Reasigna esos gastos antes de cambiar la fecha.",
   "not-found": "No se encontró el cierre.",
@@ -136,6 +135,7 @@ export default async function ClosingDetailPage({
     `SELECT c.id, DATE_FORMAT(c.operation_date, '%Y-%m-%d') AS operation_date,
             c.reported_sales_total, c.gross_reported_sales_total,
             c.pedidos_ya_total, c.cash_total, c.gross_cash_total,
+            c.tips_total,
             c.status, c.notes,
             u.name AS created_by_name
      FROM daily_closings c
@@ -153,7 +153,6 @@ export default async function ClosingDetailPage({
   const [
     [channelPayments],
     [cashOutflows],
-    [tips],
     [legacyPayments],
     [legacyAdjustments],
     [expenseDeductions],
@@ -168,13 +167,6 @@ export default async function ClosingDetailPage({
     pool.execute<CashOutflowRow[]>(
       `SELECT line_number, description, amount
        FROM daily_closing_cash_outflows
-       WHERE daily_closing_id = ?
-       ORDER BY line_number`,
-      [id],
-    ),
-    pool.execute<TipRow[]>(
-      `SELECT line_number, recipient_name, amount
-       FROM daily_closing_tips
        WHERE daily_closing_id = ?
        ORDER BY line_number`,
       [id],
@@ -234,12 +226,12 @@ export default async function ClosingDetailPage({
   const outflowsByLine = new Map(
     cashOutflows.map((outflow) => [outflow.line_number, outflow]),
   );
-  const tipsByLine = new Map(tips.map((tip) => [tip.line_number, tip]));
   const initial: ClosingFormDefaults = {
     operation_date: closing.operation_date,
     reported_sales_total: closing.gross_reported_sales_total,
     pedidos_ya_total: closing.pedidos_ya_total,
     cash_total: closing.gross_cash_total,
+    tips_total: closing.tips_total,
     channelPayments: closingPaymentTypes.flatMap((paymentType) =>
       closingPaymentChannels.map((paymentChannel) => ({
         payment_type: paymentType,
@@ -255,24 +247,28 @@ export default async function ClosingDetailPage({
         amount: outflow?.amount ?? "0.00",
       };
     }),
-    tips: Array.from({ length: tipSlots }, (_, index) => {
-      const tip = tipsByLine.get(index + 1);
-      return {
-        recipient: tip?.recipient_name ?? "",
-        amount: tip?.amount ?? "0.00",
-      };
-    }),
     notes: closing.notes ?? "",
   };
   const totals = calculateClosingTotals({
     pedidosYaTotal: initial.pedidos_ya_total,
     cashTotal: initial.cash_total,
     channelPayments: initial.channelPayments,
-    tips: initial.tips,
+    cashOutflows: initial.cashOutflows,
+    tipsTotal: initial.tips_total,
   });
+  const cashOutflowTotal = sumMoney(
+    cashOutflows.map((outflow) => outflow.amount),
+  );
   const expenseDeductionTotal = sumMoney(
     expenseDeductions.map((expense) => expense.amount),
   );
+  const totalCashDeductions = sumMoney([
+    cashOutflowTotal,
+    expenseDeductionTotal,
+  ]);
+  const invalidExistingDeductions =
+    totals === null ||
+    moneyToCents(totalCashDeductions) > moneyToCents(closing.gross_cash_total);
   const paramsValue = await searchParams;
   const error = firstValue(paramsValue.error);
   const updated = firstValue(paramsValue.updated);
@@ -307,6 +303,12 @@ export default async function ClosingDetailPage({
         {error ? (
           <p className="form-error" role="alert">
             {errorMessages[error] ?? "Ocurrió un error al guardar el cierre."}
+          </p>
+        ) : null}
+        {invalidExistingDeductions ? (
+          <p className="form-error" role="alert">
+            Las salidas y gastos de este cierre superan el efectivo contado.
+            Ajusta los importes antes de guardar una corrección.
           </p>
         ) : null}
 
@@ -355,12 +357,18 @@ export default async function ClosingDetailPage({
         ) : null}
 
         <section className="dashboard-card">
-          <h2>Gastos descontados de este cierre</h2>
+          <h2>Salidas y gastos descontados</h2>
           <p className="form-hint">
-            El importe se resta del efectivo guardado y del total del cierre.
-            Los valores brutos quedan conservados para auditoría y recálculo.
+            Las salidas de caja y los gastos asignados se restan del efectivo y
+            del Reporte Z. Los valores originales quedan conservados para
+            auditoría y recálculo.
           </p>
           <div className="closing-totals">
+            <article>
+              <h3>Salidas de caja</h3>
+              <p>{formatMoney(cashOutflowTotal)}</p>
+              <span>{cashOutflows.length} salida(s) registrada(s)</span>
+            </article>
             <article>
               <h3>Gastos descontados</h3>
               <p>{formatMoney(expenseDeductionTotal)}</p>
@@ -370,15 +378,21 @@ export default async function ClosingDetailPage({
               <h3>Efectivo neto</h3>
               <p>{formatMoney(closing.cash_total)}</p>
               <span>
-                {formatMoney(closing.gross_cash_total)} menos gastos de caja
+                {formatMoney(closing.gross_cash_total)} menos salidas y gastos
               </span>
             </article>
             <article>
               <h3>Total neto del cierre</h3>
               <p>{formatMoney(closing.reported_sales_total)}</p>
               <span>
-                {formatMoney(closing.gross_reported_sales_total)} menos gastos
+                {formatMoney(closing.gross_reported_sales_total)} menos salidas
+                y gastos
               </span>
+            </article>
+            <article>
+              <h3>Propina del día</h3>
+              <p>{formatMoney(closing.tips_total)}</p>
+              <span>Seguimiento separado del Reporte Z</span>
             </article>
           </div>
           {expenseDeductions.length === 0 ? (

@@ -134,41 +134,18 @@ export default function ClosingPreviewPage() {
         </section>
 
         <section className="dashboard-card">
-          <h2>Propinas</h2>
-          <div className="table-scroll">
-            <table className="closing-entry-table">
-              <thead>
-                <tr>
-                  <th scope="col">#</th>
-                  <th scope="col">Persona</th>
-                  <th scope="col">Importe</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Array.from({ length: 5 }, (_, index) => (
-                  <tr key={index}>
-                    <th scope="row">{index + 1}</th>
-                    <td>
-                      <input aria-label={`Persona ${index + 1}`} />
-                    </td>
-                    <td>
-                      <input
-                        aria-label={`Importe de propina ${index + 1}`}
-                        min="0"
-                        placeholder="0.00"
-                        step="0.01"
-                        type="number"
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <h2>Propina del día</h2>
+          <label>
+            Total de propinas
+            <input min="0" placeholder="0.00" step="0.01" type="number" />
+          </label>
+          <p className="form-hint">
+            Se registra como un total y no se suma ni se resta del Reporte Z.
+          </p>
         </section>
 
         <section aria-label="Totales" className="closing-totals">
-          {["Total Reporte Z", "Total Banco", "Efectivo", "Total Propinas"].map(
+          {["Total Reporte Z", "Total Banco", "Efectivo neto", "Propina del día"].map(
             (label) => (
               <article key={label}>
                 <h3>{label}</h3>

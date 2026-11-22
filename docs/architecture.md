@@ -31,9 +31,9 @@ inventario por ingredientes ni sincronización automática con el POS.
 | Gerente | Operación y finanzas autorizadas. |
 
 Navegación privada: Inicio, Cierres diarios, Gastos, Proveedores, cuentas por
-pagar, Informes y Auditoría. Usuarios quedan en Administración. Personal se
-reserva para una fase posterior. Cada ruta y mutación valida la sesión y el
-permiso en el servidor.
+pagar, Propinas, Informes y Auditoría. Usuarios quedan en Administración.
+Personal se reserva para una fase posterior. Cada ruta y mutación valida la
+sesión y el permiso en el servidor.
 
 ## Decisiones contables iniciales
 
@@ -47,11 +47,14 @@ permiso en el servidor.
 - La matriz de Tarjeta de crédito/Clave por Punto de Venta, BAC, Banesco, Yappy
   y ACH desglosa Reporte Z, no representa ventas adicionales. Total Banco es la
   suma de sus diez celdas y no vuelve a sumarse fuera del desglose.
-- El efectivo se captura en el campo `cash_total` como monto contado/registrado;
-  no se calcula restando banco ni salidas. Las salidas conservan descripción e
-  importe en el cierre y no crean gastos. Las propinas se guardan por persona e
-  importe; su total es calculado por separado y no se suma a ventas ni banco.
-  “Realizado por” corresponde al usuario autenticado que creó el cierre.
+- El efectivo se captura como monto contado antes de las salidas. `cash_total`
+  y Reporte Z guardan el neto después de salidas de caja y gastos asignados; las
+  salidas conservan descripción e importe y no crean gastos. No se permite que
+  esas deducciones superen el efectivo contado.
+- La propina se captura como un único total diario. Se informa por separado,
+  nunca se suma ni se resta del Reporte Z, el efectivo o el banco. La página de
+  Propinas permite consultar totales por día, semana y mes.
+- “Realizado por” corresponde al usuario autenticado que creó el cierre.
 - La migración del formato PDF conserva los cierres y sus datos genéricos
   históricos; no los convierte a la matriz nueva por no existir una equivalencia
   contable fiable.

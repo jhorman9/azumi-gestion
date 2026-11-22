@@ -24,7 +24,8 @@ function initialTotals(initial: ClosingFormDefaults) {
     pedidosYaTotal: initial.pedidos_ya_total,
     cashTotal: initial.cash_total,
     channelPayments: initial.channelPayments,
-    tips: initial.tips,
+    cashOutflows: initial.cashOutflows,
+    tipsTotal: initial.tips_total,
   });
 }
 
@@ -55,7 +56,8 @@ export function ClosingForm({
         pedidosYaTotal: values.pedidos_ya_total,
         cashTotal: values.cash_total,
         channelPayments: values.channel_payments,
-        tips: values.tips,
+        cashOutflows: values.cash_outflows,
+        tipsTotal: values.tips_total,
       }),
     );
   }
@@ -90,7 +92,7 @@ export function ClosingForm({
           />
         </label>
         <label>
-          Efectivo (Total Dinero)
+          Efectivo contado (antes de salidas)
           <input
             defaultValue={initial.cash_total}
             min="0"
@@ -192,50 +194,29 @@ export function ClosingForm({
 
       <fieldset>
         <legend>Propinas</legend>
-        <div className="table-scroll">
-          <table className="closing-entry-table">
-            <thead>
-              <tr>
-                <th scope="col">#</th>
-                <th scope="col">Persona</th>
-                <th scope="col">Importe</th>
-              </tr>
-            </thead>
-            <tbody>
-              {initial.tips.map((tip, index) => (
-                <tr key={index}>
-                  <th scope="row">{index + 1}</th>
-                  <td>
-                    <input
-                      aria-label={`Persona para propina ${index + 1}`}
-                      defaultValue={tip.recipient ?? ""}
-                      maxLength={120}
-                      name={`tip_${index + 1}_recipient`}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      aria-label={`Importe de propina ${index + 1}`}
-                      defaultValue={tip.amount}
-                      min="0"
-                      name={`tip_${index + 1}_amount`}
-                      required
-                      step="0.01"
-                      type="number"
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <p className="form-hint">
+          Registra el total de propinas del día. Se informa por separado y no
+          afecta el Reporte Z ni el efectivo.
+        </p>
+        <label>
+          Propina total del día
+          <input
+            aria-label="Propina total del día"
+            defaultValue={initial.tips_total}
+            min="0"
+            name="tips_total"
+            required
+            step="0.01"
+            type="number"
+          />
+        </label>
       </fieldset>
 
       <section aria-label="Totales calculados" className="closing-totals">
         <article>
-          <h3>Total antes de gastos</h3>
+          <h3>Reporte Z antes de gastos asignados</h3>
           <p>{totals ? formatMoney(totals.reportedSalesTotal) : "—"}</p>
-          <span>Reporte Z bruto: efectivo + banco + Pedidos Ya</span>
+          <span>Efectivo neto + banco + Pedidos Ya; propinas excluidas</span>
         </article>
         <article>
           <h3>Total Banco</h3>
@@ -243,16 +224,27 @@ export function ClosingForm({
           <span>Suma de las 10 celdas del desglose</span>
         </article>
         <article>
-          <h3>Efectivo</h3>
+          <h3>Efectivo después de salidas</h3>
           <p>{totals ? formatMoney(totals.cashTotal) : "—"}</p>
-          <span>Importe contado antes de gastos asignados a este cierre</span>
+          <span>Importe contado menos las salidas de caja</span>
         </article>
         <article>
-          <h3>Total Propinas</h3>
+          <h3>Salidas de caja</h3>
+          <p>{totals ? formatMoney(totals.cashOutflowTotal) : "—"}</p>
+          <span>Se restan del efectivo y del Reporte Z</span>
+        </article>
+        <article>
+          <h3>Propina del día</h3>
           <p>{totals ? formatMoney(totals.tipsTotal) : "—"}</p>
-          <span>Suma de los importes individuales</span>
+          <span>Se lleva por separado</span>
         </article>
       </section>
+      {totals === null ? (
+        <p className="form-error" role="alert">
+          Revisa los importes y confirma que las salidas no superen el efectivo
+          contado.
+        </p>
+      ) : null}
 
       <label>
         Notas

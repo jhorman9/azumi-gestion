@@ -15,9 +15,14 @@ interface DeductionRow extends RowDataPacket {
   amount: string;
 }
 
+interface CashOutflowRow extends RowDataPacket {
+  amount: string;
+}
+
 export interface ClosingDeductionSummary {
   closingId: string;
   deductionTotal: string;
+  cashOutflowTotal: string;
   grossCashTotal: string;
   cashTotal: string;
   grossReportedSalesTotal: string;
@@ -62,10 +67,21 @@ export async function refreshClosingExpenseDeduction(
   const deductionTotal = sumMoney(
     deductionRows.map((expense) => expense.amount),
   );
-  const cashTotal = subtractMoney(closing.gross_cash_total, deductionTotal);
+  const [outflowRows] = await connection.execute<CashOutflowRow[]>(
+    `SELECT amount
+     FROM daily_closing_cash_outflows
+     WHERE daily_closing_id = ?
+     FOR UPDATE`,
+    [closing.id],
+  );
+  const cashOutflowTotal = sumMoney(
+    outflowRows.map((outflow) => outflow.amount),
+  );
+  const totalDeduction = sumMoney([deductionTotal, cashOutflowTotal]);
+  const cashTotal = subtractMoney(closing.gross_cash_total, totalDeduction);
   const reportedSalesTotal = subtractMoney(
     closing.gross_reported_sales_total,
-    deductionTotal,
+    totalDeduction,
   );
 
   if (cashTotal === null || reportedSalesTotal === null) {
@@ -99,6 +115,7 @@ export async function refreshClosingExpenseDeduction(
           cash_total: cashTotal,
           reported_sales_total: reportedSalesTotal,
           expense_deduction_total: deductionTotal,
+          cash_outflow_total: cashOutflowTotal,
         },
       });
     }
@@ -107,6 +124,7 @@ export async function refreshClosingExpenseDeduction(
   return {
     closingId: String(closing.id),
     deductionTotal,
+    cashOutflowTotal,
     grossCashTotal: closing.gross_cash_total,
     cashTotal,
     grossReportedSalesTotal: closing.gross_reported_sales_total,

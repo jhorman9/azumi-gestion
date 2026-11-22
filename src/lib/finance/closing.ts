@@ -27,7 +27,6 @@ export const closingPaymentChannelLabels: Record<
 };
 
 export const cashOutflowSlots = 6;
-export const tipSlots = 5;
 
 export interface ClosingPayment {
   payment_type: ClosingPaymentType;
@@ -40,19 +39,14 @@ export interface CashOutflow {
   amount: string;
 }
 
-export interface ClosingTip {
-  recipient: string | null;
-  amount: string;
-}
-
 export interface ClosingFormDefaults {
   operation_date: string;
   reported_sales_total: string;
   pedidos_ya_total: string;
   cash_total: string;
+  tips_total: string;
   channelPayments: ClosingPayment[];
   cashOutflows: CashOutflow[];
-  tips: ClosingTip[];
   notes: string;
 }
 
@@ -60,14 +54,18 @@ export interface ClosingTotalsInput {
   pedidosYaTotal: string;
   cashTotal: string;
   channelPayments: readonly Pick<ClosingPayment, "amount">[];
-  tips: readonly Pick<ClosingTip, "amount">[];
+  cashOutflows: readonly Pick<CashOutflow, "amount">[];
+  tipsTotal: string;
 }
 
 export interface ClosingTotals {
   reportedSalesTotal: string;
   bankTotal: string;
   cashTotal: string;
+  cashOutflowTotal: string;
   tipsTotal: string;
+  grossCashTotal: string;
+  grossReportedSalesTotal: string;
 }
 
 export function collectClosingFormFields(fields: Record<string, string>) {
@@ -90,10 +88,7 @@ export function collectClosingFormFields(fields: Record<string, string>) {
       description: fields[`cash_outflow_${index + 1}_description`] ?? "",
       amount: fields[`cash_outflow_${index + 1}_amount`] ?? "",
     })),
-    tips: Array.from({ length: tipSlots }, (_, index) => ({
-      recipient: fields[`tip_${index + 1}_recipient`] ?? "",
-      amount: fields[`tip_${index + 1}_amount`] ?? "",
-    })),
+    tips_total: fields.tips_total ?? "",
   };
 }
 
@@ -124,13 +119,17 @@ export function calculateClosingTotals(
   const channelAmounts = input.channelPayments.map((payment) =>
     parseCents(payment.amount),
   );
-  const tipAmounts = input.tips.map((tip) => parseCents(tip.amount));
+  const outflowAmounts = input.cashOutflows.map((outflow) =>
+    parseCents(outflow.amount),
+  );
+  const tipsTotal = parseCents(input.tipsTotal);
 
   if (
     pedidosYa === null ||
     cash === null ||
     channelAmounts.some((amount) => amount === null) ||
-    tipAmounts.some((amount) => amount === null)
+    outflowAmounts.some((amount) => amount === null) ||
+    tipsTotal === null
   ) {
     return null;
   }
@@ -138,24 +137,34 @@ export function calculateClosingTotals(
   const validChannelAmounts = channelAmounts.filter(
     (amount): amount is bigint => amount !== null,
   );
-  const validTipAmounts = tipAmounts.filter(
+  const validOutflowAmounts = outflowAmounts.filter(
     (amount): amount is bigint => amount !== null,
   );
   const bankTotal = validChannelAmounts.reduce(
     (total, amount) => total + amount,
     BigInt(0),
   );
-  const tipsTotal = validTipAmounts.reduce(
+  const cashOutflowTotal = validOutflowAmounts.reduce(
     (total, amount) => total + amount,
     BigInt(0),
   );
-  const reportedSales = cash + bankTotal + pedidosYa;
+  const netCash = cash - cashOutflowTotal;
+
+  if (netCash < BigInt(0)) {
+    return null;
+  }
+
+  const grossReportedSales = cash + bankTotal + pedidosYa;
+  const reportedSales = netCash + bankTotal + pedidosYa;
 
   return {
     reportedSalesTotal: centsToMoney(reportedSales),
     bankTotal: centsToMoney(bankTotal),
-    cashTotal: centsToMoney(cash),
+    cashTotal: centsToMoney(netCash),
+    cashOutflowTotal: centsToMoney(cashOutflowTotal),
     tipsTotal: centsToMoney(tipsTotal),
+    grossCashTotal: centsToMoney(cash),
+    grossReportedSalesTotal: centsToMoney(grossReportedSales),
   };
 }
 
@@ -167,6 +176,7 @@ export function emptyClosingFormDefaults(
     reported_sales_total: "0.00",
     pedidos_ya_total: "0.00",
     cash_total: "0.00",
+    tips_total: "0.00",
     channelPayments: closingPaymentTypes.flatMap((paymentType) =>
       closingPaymentChannels.map((paymentChannel) => ({
         payment_type: paymentType,
@@ -176,10 +186,6 @@ export function emptyClosingFormDefaults(
     ),
     cashOutflows: Array.from({ length: cashOutflowSlots }, () => ({
       description: "",
-      amount: "0.00",
-    })),
-    tips: Array.from({ length: tipSlots }, () => ({
-      recipient: "",
       amount: "0.00",
     })),
     notes: "",

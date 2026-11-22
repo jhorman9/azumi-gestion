@@ -51,7 +51,17 @@ export async function POST(request: Request) {
     collectClosingFormFields(formFields(formData)),
   );
 
-  if (!parsed.success || parsed.data.action === "correct") {
+  if (!parsed.success) {
+    const invalidOutflows = parsed.error.issues.some(
+      (issue) => issue.path[0] === "cash_outflows",
+    );
+    return redirectToClosings(
+      request,
+      invalidOutflows ? "error=outflow-invalid" : "error=invalid",
+    );
+  }
+
+  if (parsed.data.action === "correct") {
     return redirectToClosings(request, "error=invalid");
   }
 
@@ -59,7 +69,8 @@ export async function POST(request: Request) {
     pedidosYaTotal: parsed.data.pedidos_ya_total,
     cashTotal: parsed.data.cash_total,
     channelPayments: parsed.data.channel_payments,
-    tips: parsed.data.tips,
+    cashOutflows: parsed.data.cash_outflows,
+    tipsTotal: parsed.data.tips_total,
   });
 
   if (!totals) {
@@ -78,17 +89,18 @@ export async function POST(request: Request) {
     const [result] = await connection.execute<ResultSetHeader>(
       `INSERT INTO daily_closings
         (operation_date, reported_sales_total, gross_reported_sales_total,
-         pedidos_ya_total, cash_total, gross_cash_total, status, notes,
+         pedidos_ya_total, cash_total, gross_cash_total, tips_total, status, notes,
          created_by, confirmed_by, confirmed_at, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, IF(? = 1, UTC_TIMESTAMP(3), NULL),
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, IF(? = 1, UTC_TIMESTAMP(3), NULL),
          UTC_TIMESTAMP(3), UTC_TIMESTAMP(3))`,
       [
         parsed.data.operation_date,
         totals.reportedSalesTotal,
-        totals.reportedSalesTotal,
+        totals.grossReportedSalesTotal,
         parsed.data.pedidos_ya_total,
-        parsed.data.cash_total,
-        parsed.data.cash_total,
+        totals.cashTotal,
+        totals.grossCashTotal,
+        totals.tipsTotal,
         confirmed ? "confirmed" : "draft",
         parsed.data.notes,
         actor.id,
@@ -97,12 +109,6 @@ export async function POST(request: Request) {
       ],
     );
     const closingId = String(result.insertId);
-    const adjustedClosing = await refreshClosingExpenseDeduction(
-      connection,
-      parsed.data.operation_date,
-      actor.id,
-      false,
-    );
 
     for (const payment of parsed.data.channel_payments) {
       await connection.execute(
@@ -131,18 +137,12 @@ export async function POST(request: Request) {
       );
     }
 
-    for (const [index, tip] of parsed.data.tips.entries()) {
-      if (tip.recipient === null) {
-        continue;
-      }
-
-      await connection.execute(
-        `INSERT INTO daily_closing_tips
-          (daily_closing_id, line_number, recipient_name, amount)
-         VALUES (?, ?, ?, ?)`,
-        [closingId, index + 1, tip.recipient, tip.amount],
-      );
-    }
+    const adjustedClosing = await refreshClosingExpenseDeduction(
+      connection,
+      parsed.data.operation_date,
+      actor.id,
+      false,
+    );
 
     await writeAuditLog(connection, {
       actorUserId: actor.id,
@@ -153,14 +153,15 @@ export async function POST(request: Request) {
         operation_date: parsed.data.operation_date,
         reported_sales_total:
           adjustedClosing?.reportedSalesTotal ?? totals.reportedSalesTotal,
-        gross_reported_sales_total: totals.reportedSalesTotal,
+        gross_reported_sales_total: totals.grossReportedSalesTotal,
         pedidos_ya_total: parsed.data.pedidos_ya_total,
         cash_total: adjustedClosing?.cashTotal ?? parsed.data.cash_total,
-        gross_cash_total: parsed.data.cash_total,
+        gross_cash_total: totals.grossCashTotal,
+        cash_outflow_total: totals.cashOutflowTotal,
         expense_deduction_total: adjustedClosing?.deductionTotal ?? "0.00",
+        tips_total: totals.tipsTotal,
         channel_payments: parsed.data.channel_payments,
         cash_outflows: parsed.data.cash_outflows,
-        tips: parsed.data.tips,
         status: confirmed ? "confirmed" : "draft",
       },
     });

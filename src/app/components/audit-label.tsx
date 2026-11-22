@@ -10,6 +10,7 @@ const actionLabels: Record<string, string> = {
   voided: "Anulado",
   status_changed: "Estado actualizado",
   expense_deduction_adjusted: "Descuento del cierre actualizado",
+  cash_outflow_deduction_adjusted: "Salida de caja descontada",
   bootstrap_admin_created: "Administrador creado",
 };
 

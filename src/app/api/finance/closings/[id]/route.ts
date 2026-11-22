@@ -29,6 +29,7 @@ interface ClosingRow extends RowDataPacket {
   pedidos_ya_total: string;
   cash_total: string;
   gross_cash_total: string;
+  tips_total: string;
   status: "draft" | "confirmed" | "corrected";
   notes: string | null;
   confirmed_by: string | number | null;
@@ -59,12 +60,6 @@ interface ChannelPaymentRow extends RowDataPacket {
 interface CashOutflowRow extends RowDataPacket {
   line_number: number;
   description: string;
-  amount: string;
-}
-
-interface TipRow extends RowDataPacket {
-  line_number: number;
-  recipient_name: string;
   amount: string;
 }
 
@@ -116,14 +111,22 @@ export async function POST(
   );
 
   if (!parsed.success) {
-    return redirectToClosing(request, id, "error=invalid");
+    const invalidOutflows = parsed.error.issues.some(
+      (issue) => issue.path[0] === "cash_outflows",
+    );
+    return redirectToClosing(
+      request,
+      id,
+      invalidOutflows ? "error=outflow-invalid" : "error=invalid",
+    );
   }
 
   const totals = calculateClosingTotals({
     pedidosYaTotal: parsed.data.pedidos_ya_total,
     cashTotal: parsed.data.cash_total,
     channelPayments: parsed.data.channel_payments,
-    tips: parsed.data.tips,
+    cashOutflows: parsed.data.cash_outflows,
+    tipsTotal: parsed.data.tips_total,
   });
 
   if (!totals) {
@@ -211,13 +214,6 @@ export async function POST(
        ORDER BY line_number`,
       [id],
     );
-    const [oldTips] = await connection.execute<TipRow[]>(
-      `SELECT line_number, recipient_name, amount
-       FROM daily_closing_tips
-       WHERE daily_closing_id = ?
-       ORDER BY line_number`,
-      [id],
-    );
     const beforeData = {
       operation_date: closing.operation_date,
       reported_sales_total: closing.reported_sales_total,
@@ -233,7 +229,7 @@ export async function POST(
       legacy_adjustments: oldAdjustments,
       channel_payments: oldChannelPayments,
       cash_outflows: oldCashOutflows,
-      tips: oldTips,
+      tips_total: closing.tips_total,
     };
 
     const newStatus = isCorrection
@@ -245,7 +241,8 @@ export async function POST(
       `UPDATE daily_closings
        SET operation_date = ?, reported_sales_total = ?,
            gross_reported_sales_total = ?, pedidos_ya_total = ?,
-           cash_total = ?, gross_cash_total = ?, status = ?, notes = ?,
+           cash_total = ?, gross_cash_total = ?, tips_total = ?,
+           status = ?, notes = ?,
            confirmed_by = IF(? = 1, NULL, ?),
            confirmed_at = IF(? = 1, NULL, UTC_TIMESTAMP(3)),
            updated_at = UTC_TIMESTAMP(3)
@@ -253,10 +250,11 @@ export async function POST(
       [
         parsed.data.operation_date,
         totals.reportedSalesTotal,
-        totals.reportedSalesTotal,
+        totals.grossReportedSalesTotal,
         parsed.data.pedidos_ya_total,
-        parsed.data.cash_total,
-        parsed.data.cash_total,
+        totals.cashTotal,
+        totals.grossCashTotal,
+        totals.tipsTotal,
         newStatus,
         parsed.data.notes,
         newStatus === "draft" ? 1 : 0,
@@ -265,13 +263,6 @@ export async function POST(
         id,
       ],
     );
-    const adjustedClosing = await refreshClosingExpenseDeduction(
-      connection,
-      parsed.data.operation_date,
-      actor.id,
-      false,
-    );
-
     await connection.execute(
       "DELETE FROM daily_closing_channel_payments WHERE daily_closing_id = ?",
       [id],
@@ -307,23 +298,6 @@ export async function POST(
       );
     }
 
-    await connection.execute(
-      "DELETE FROM daily_closing_tips WHERE daily_closing_id = ?",
-      [id],
-    );
-    for (const [index, tip] of parsed.data.tips.entries()) {
-      if (tip.recipient === null) {
-        continue;
-      }
-
-      await connection.execute(
-        `INSERT INTO daily_closing_tips
-          (daily_closing_id, line_number, recipient_name, amount)
-         VALUES (?, ?, ?, ?)`,
-        [id, index + 1, tip.recipient, tip.amount],
-      );
-    }
-
     const [newChannelPayments] =
       await connection.execute<ChannelPaymentRow[]>(
         `SELECT payment_type, payment_channel, amount
@@ -338,28 +312,28 @@ export async function POST(
        ORDER BY line_number`,
       [id],
     );
-    const [newTips] = await connection.execute<TipRow[]>(
-      `SELECT line_number, recipient_name, amount
-       FROM daily_closing_tips
-       WHERE daily_closing_id = ?
-       ORDER BY line_number`,
-      [id],
+    const adjustedClosing = await refreshClosingExpenseDeduction(
+      connection,
+      parsed.data.operation_date,
+      actor.id,
+      false,
     );
     const afterData = {
       operation_date: parsed.data.operation_date,
       reported_sales_total:
         adjustedClosing?.reportedSalesTotal ?? totals.reportedSalesTotal,
-      gross_reported_sales_total: totals.reportedSalesTotal,
+      gross_reported_sales_total: totals.grossReportedSalesTotal,
       pedidos_ya_total: parsed.data.pedidos_ya_total,
       cash_total: adjustedClosing?.cashTotal ?? parsed.data.cash_total,
-      gross_cash_total: parsed.data.cash_total,
+      gross_cash_total: totals.grossCashTotal,
+      cash_outflow_total: totals.cashOutflowTotal,
       expense_deduction_total: adjustedClosing?.deductionTotal ?? "0.00",
+      tips_total: totals.tipsTotal,
       status: newStatus,
       notes: parsed.data.notes,
       confirmed_by: newStatus === "draft" ? null : actor.id,
       channel_payments: newChannelPayments,
       cash_outflows: newCashOutflows,
-      tips: newTips,
       legacy_payments: oldPayments,
       legacy_adjustments: oldAdjustments,
       ...(isCorrection

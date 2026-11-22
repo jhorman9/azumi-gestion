@@ -9,7 +9,6 @@ import {
   cashOutflowSlots,
   closingPaymentChannels,
   closingPaymentTypes,
-  tipSlots,
 } from "@/lib/finance/closing";
 import { todayInPanama } from "@/lib/finance/dates";
 
@@ -66,17 +65,13 @@ const closingOutflowSchema = z.object({
   amount: nonNegativeMoneySchema,
 });
 
-const closingTipSchema = z.object({
-  recipient: optionalText(120),
-  amount: nonNegativeMoneySchema,
-});
-
 export const closingFormSchema = z
   .object({
     action: z.enum(["save", "confirm", "correct"]),
     operation_date: businessDateSchema,
     pedidos_ya_total: nonNegativeMoneySchema,
     cash_total: nonNegativeMoneySchema,
+    tips_total: nonNegativeMoneySchema,
     notes: optionalText(2000),
     correction_reason: optionalText(500),
     channel_payments: z
@@ -89,7 +84,6 @@ export const closingFormSchema = z
       )
       .length(closingPaymentTypes.length * closingPaymentChannels.length),
     cash_outflows: z.array(closingOutflowSchema).length(cashOutflowSlots),
-    tips: z.array(closingTipSchema).length(tipSlots),
   })
   .superRefine((value, context) => {
     if (value.action === "correct" && !value.correction_reason) {
@@ -113,18 +107,17 @@ export const closingFormSchema = z
       }
     });
 
-    value.tips.forEach((tip, index) => {
-      if (
-        (tip.recipient === null) !==
-        (moneyToCents(tip.amount) === BigInt(0))
-      ) {
-        context.addIssue({
-          code: "custom",
-          message: "Completa persona e importe para cada propina.",
-          path: ["tips", index],
-        });
-      }
-    });
+    const outflowTotal = value.cash_outflows.reduce(
+      (total, outflow) => total + moneyToCents(outflow.amount),
+      BigInt(0),
+    );
+    if (outflowTotal > moneyToCents(value.cash_total)) {
+      context.addIssue({
+        code: "custom",
+        message: "Las salidas de caja no pueden superar el efectivo contado.",
+        path: ["cash_outflows"],
+      });
+    }
   });
 
 export const supplierSchema = z.object({

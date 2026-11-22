@@ -29,6 +29,7 @@ interface ClosingRow extends RowDataPacket {
   reported_sales_total: string;
   pedidos_ya_total: string;
   cash_total: string;
+  cash_outflow_total: string;
   expense_deduction_total: string;
   bank_total: string;
   status: "confirmed" | "corrected";
@@ -86,6 +87,11 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
     pool.execute<ClosingRow[]>(
       `SELECT DATE_FORMAT(operation_date, '%Y-%m-%d') AS operation_date,
               reported_sales_total, pedidos_ya_total, cash_total,
+              COALESCE((
+                SELECT SUM(o.amount)
+                FROM daily_closing_cash_outflows o
+                WHERE o.daily_closing_id = daily_closings.id
+              ), 0.00) AS cash_outflow_total,
               COALESCE((
                 SELECT SUM(e.amount)
                 FROM expenses e
@@ -216,6 +222,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
                     <th scope="col">Pedidos Ya</th>
                     <th scope="col">Total banco</th>
                     <th scope="col">Efectivo neto</th>
+                    <th scope="col">Salidas de caja</th>
                     <th scope="col">Gastos descontados</th>
                     <th scope="col">Estado</th>
                   </tr>
@@ -228,6 +235,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
                       <td>{formatMoney(closing.pedidos_ya_total)}</td>
                       <td>{formatMoney(closing.bank_total)}</td>
                       <td>{formatMoney(closing.cash_total)}</td>
+                      <td>{formatMoney(closing.cash_outflow_total)}</td>
                       <td>{formatMoney(closing.expense_deduction_total)}</td>
                       <td>
                         {closing.status === "corrected" ? "Corregido" : "Confirmado"}

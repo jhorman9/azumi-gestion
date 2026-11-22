@@ -18,6 +18,7 @@ interface ClosingRow extends RowDataPacket {
   reported_sales_total: string;
   pedidos_ya_total: string;
   cash_total: string;
+  cash_outflow_total: string;
   bank_total: string;
   expense_deduction_total: string;
   last_action: string | null;
@@ -37,7 +38,9 @@ const errorMessages: Record<string, string> = {
   invalid: "Revisa los datos del cierre.",
   duplicate: "Ya existe un cierre para esa fecha.",
   "deduction-exceeds-cash":
-    "Los gastos descontados superan el efectivo registrado para este cierre.",
+    "Las salidas de caja y los gastos descontados superan el efectivo contado.",
+  "outflow-invalid":
+    "Completa cada salida y verifica que su suma no supere el efectivo contado.",
   failed: "No fue posible guardar el cierre.",
 };
 
@@ -59,6 +62,11 @@ export default async function ClosingsPage({
   const [closings] = await getDbPool().execute<ClosingRow[]>(
     `SELECT c.id, DATE_FORMAT(c.operation_date, '%Y-%m-%d') AS operation_date,
             c.reported_sales_total, c.pedidos_ya_total, c.cash_total,
+          COALESCE((
+            SELECT SUM(o.amount)
+            FROM daily_closing_cash_outflows o
+            WHERE o.daily_closing_id = c.id
+          ), 0.00) AS cash_outflow_total,
           COALESCE((
             SELECT SUM(e.amount)
             FROM expenses e
@@ -103,8 +111,8 @@ export default async function ClosingsPage({
           </div>
           <p>
             Registra el Reporte Z, Pedidos Ya, el desglose bancario, las salidas
-            de caja y las propinas. Los gastos asignados a un cierre aparecen
-            como una resta de su total.
+            de caja y la propina total del día. Las salidas se restan del
+            efectivo y del Reporte Z; la propina se informa por separado.
           </p>
         </div>
 
@@ -144,6 +152,7 @@ export default async function ClosingsPage({
                     <th scope="col">Pedidos Ya</th>
                     <th scope="col">Total banco</th>
                     <th scope="col">Efectivo neto</th>
+                    <th scope="col">Salidas de caja</th>
                     <th scope="col">Gastos restados</th>
                     <th scope="col">Estado</th>
                     <th scope="col">Último cambio</th>
@@ -158,6 +167,7 @@ export default async function ClosingsPage({
                       <td>{formatMoney(closing.pedidos_ya_total)}</td>
                       <td>{formatMoney(closing.bank_total)}</td>
                       <td>{formatMoney(closing.cash_total)}</td>
+                      <td>{formatMoney(closing.cash_outflow_total)}</td>
                       <td>{formatMoney(closing.expense_deduction_total)}</td>
                       <td>{statusLabels[closing.status]}</td>
                       <td>
