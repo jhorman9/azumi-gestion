@@ -1612,57 +1612,8 @@ th {
 
 .dashboard-bottom-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(270px, 0.85fr);
+  grid-template-columns: minmax(0, 1.65fr) minmax(270px, 0.8fr);
   gap: 16px;
-}
-
-.dashboard-note-card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  min-height: 230px;
-  padding-left: 29px;
-  overflow: hidden;
-  background:
-    radial-gradient(circle at 100% 0, rgb(189 36 43 / 9%), transparent 13rem),
-    #fff;
-}
-
-.dashboard-note-card::before {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 4px;
-  background: linear-gradient(#d94a4f, #a71f27);
-  content: "";
-}
-
-.note-icon {
-  display: grid;
-  width: 40px;
-  height: 40px;
-  margin-bottom: 19px;
-  place-items: center;
-  border-radius: 12px;
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
-.dashboard-note-card .eyebrow {
-  margin-bottom: 7px;
-}
-
-.dashboard-note-card h2 {
-  font-size: 1.13rem;
-}
-
-.dashboard-note-card > p:not(.eyebrow) {
-  margin: 8px 0 18px;
-  color: var(--muted);
-  font-size: 0.82rem;
 }
 
 .text-link {
@@ -2055,18 +2006,18 @@ td a:hover,
   margin-top: 2px;
 }
 
-.finance-bar-chart {
+.comparison-chart {
   display: grid;
   gap: 17px;
   padding: 5px 0;
 }
 
-.finance-bar-row {
+.comparison-chart-row {
   display: grid;
   gap: 7px;
 }
 
-.finance-bar-label {
+.comparison-chart-label {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2075,20 +2026,20 @@ td a:hover,
   font-size: 0.77rem;
 }
 
-.finance-bar-label strong {
+.comparison-chart-label strong {
   color: #292522;
   font-size: 0.76rem;
   font-weight: 680;
 }
 
-.finance-bar-track {
+.comparison-chart-track {
   height: 8px;
   overflow: hidden;
   border-radius: 99px;
   background: #f0edeb;
 }
 
-.finance-bar-fill {
+.comparison-chart-value {
   display: block;
   height: 100%;
   min-width: 0;
@@ -2096,20 +2047,241 @@ td a:hover,
   transition: width 350ms ease;
 }
 
-.finance-bar-red {
-  background: linear-gradient(90deg, #d64a50, #a91f27);
+.finance-trend-chart {
+  position: relative;
+  min-width: 0;
 }
 
-.finance-bar-dark {
-  background: linear-gradient(90deg, #6e625d, #342c28);
+.finance-trend-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  touch-action: pan-y;
 }
 
-.finance-bar-amber {
-  background: linear-gradient(90deg, #e4a247, #c77919);
+.finance-trend-svg:focus-visible {
+  border-radius: 8px;
+  outline: 2px solid #b4232c;
+  outline-offset: 3px;
 }
 
-.finance-bar-green {
-  background: linear-gradient(90deg, #62b780, #2e8b53);
+.finance-chart-gridline {
+  stroke: #eee9e6;
+  stroke-width: 1;
+}
+
+.finance-chart-axis-label {
+  fill: #8b837e;
+  font-size: 11px;
+}
+
+.finance-chart-line {
+  fill: none;
+  stroke-width: 2.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.finance-chart-hit-line {
+  fill: none;
+  pointer-events: none;
+  stroke: transparent;
+  stroke-width: 18;
+}
+
+.finance-chart-crosshair {
+  pointer-events: none;
+  stroke: #8c827d;
+  stroke-dasharray: 4 4;
+  stroke-width: 1;
+}
+
+.finance-chart-point {
+  fill: #fff;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  transition:
+    r 120ms ease,
+    stroke-width 120ms ease;
+}
+
+.finance-chart-point.is-active {
+  stroke-width: 3;
+}
+
+.finance-chart-tooltip {
+  position: absolute;
+  z-index: 1;
+  top: 8px;
+  display: grid;
+  width: min(250px, calc(100% - 24px));
+  gap: 7px;
+  padding: 11px 13px;
+  transform: translateX(-50%);
+  border: 1px solid #ece6e2;
+  border-radius: 11px;
+  background: rgb(255 255 255 / 97%);
+  box-shadow: 0 8px 26px rgb(37 29 24 / 12%);
+  color: #625a55;
+  font-size: 0.72rem;
+  pointer-events: none;
+}
+
+.finance-chart-tooltip-date {
+  margin-bottom: 2px;
+  color: #292522;
+  font-size: 0.78rem;
+  font-weight: 720;
+}
+
+.finance-chart-tooltip-row,
+.finance-chart-tooltip-row > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.finance-chart-tooltip-row > span {
+  justify-content: flex-start;
+}
+
+.finance-chart-tooltip-row strong {
+  color: #292522;
+  font-size: 0.72rem;
+  font-weight: 680;
+  white-space: nowrap;
+}
+
+.finance-chart-tooltip-marker {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+}
+
+.finance-chart-help {
+  margin: 0;
+  color: #8b837e;
+  font-size: 0.68rem;
+  line-height: 1.5;
+}
+
+.finance-trend-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  margin: 5px 0 0;
+  padding: 0;
+  color: #625a55;
+  font-size: 0.74rem;
+  list-style: none;
+}
+
+.finance-trend-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.finance-legend-marker,
+.payables-legend-marker {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+}
+
+.chart-empty-state {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.payables-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.payables-chart {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  margin: auto 0;
+  padding: 10px 0 18px;
+}
+
+.payables-donut {
+  display: block;
+  width: min(100%, 190px);
+  height: auto;
+  overflow: visible;
+}
+
+.payables-donut-track,
+.payables-donut-overdue {
+  fill: none;
+  stroke-width: 13;
+}
+
+.payables-donut-track {
+  stroke: #e7e3e1;
+}
+
+.payables-donut-overdue {
+  stroke: #b4232c;
+  stroke-linecap: round;
+}
+
+.payables-donut-caption {
+  fill: #827a75;
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+}
+
+.payables-donut-total {
+  fill: #292522;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.payables-legend {
+  display: grid;
+  width: 100%;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.payables-legend li {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  color: #625a55;
+  font-size: 0.75rem;
+}
+
+.payables-legend strong {
+  color: #292522;
+  font-size: 0.76rem;
+  font-weight: 680;
+}
+
+.payables-legend-marker.is-current {
+  background: #d7d1cd;
+}
+
+.payables-legend-marker.is-overdue {
+  background: #b4232c;
+}
+
+.payables-link {
+  align-self: flex-start;
 }
 
 .chart-caption {
@@ -2316,9 +2488,6 @@ td a:hover,
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .dashboard-note-card {
-    min-height: 190px;
-  }
 }
 
 @media (max-width: 560px) {

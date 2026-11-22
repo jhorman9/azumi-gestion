@@ -61,8 +61,11 @@ incluyen todos sus días —incluido el 29 de febrero en años bisiestos— y el
 va del 1 de enero al 31 de diciembre.
 
 El gráfico compara ventas, gastos incurridos y gastos pagados como referencia;
-no representa utilidad neta. El sidebar puede ocultarse o mostrarse y recuerda
-la preferencia en el navegador.
+en la vista mensual muestra la evolución diaria y en la anual la evolución por
+mes. Al pasar el puntero sobre los puntos se muestra el valor exacto. No
+representa utilidad neta. Un gráfico de anillo separa el saldo pendiente actual
+entre facturas al día y vencidas; no es un saldo histórico del período. El
+sidebar puede ocultarse o mostrarse y recuerda la preferencia en el navegador.
 
 ### Cierres diarios — `/dashboard/closings`
 

@@ -25,6 +25,12 @@ interface AdminUsersPageProps {
 const errorMessages: Record<string, string> = {
   duplicate: "Ya existe una cuenta con ese correo.",
   invalid: "Revisa los datos del formulario.",
+  "invalid-name": "Ingresa el nombre del usuario (máximo 120 caracteres).",
+  "invalid-email":
+    "Ingresa un correo válido de máximo 190 caracteres.",
+  "invalid-password":
+    "La contraseña debe tener al menos 12 caracteres y no superar 72 bytes UTF-8.",
+  "invalid-role": "Selecciona un rol válido.",
   self: "No puedes desactivar tu propia cuenta.",
   "not-found": "No se encontró el usuario.",
   "last-admin": "No puedes desactivar la última cuenta administradora activa.",
@@ -107,10 +113,11 @@ export default async function AdminUsersPage({
                 />
               </label>
               <label>
-                Contraseña temporal (mínimo 12 caracteres)
+                Contraseña temporal (mínimo 12 caracteres, máximo 72 bytes UTF-8)
                 <input
                   autoComplete="new-password"
                   maxLength={72}
+                  minLength={12}
                   name="password"
                   required
                   type="password"

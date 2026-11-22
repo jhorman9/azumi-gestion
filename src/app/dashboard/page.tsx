@@ -10,9 +10,10 @@ import {
   ReceiptText,
   WalletCards,
 } from "lucide-react";
-import { FinanceBarChart } from "@/app/components/finance-bar-chart";
+import { FinanceTrendChart } from "@/app/components/finance-trend-chart";
 import { MetricCard } from "@/app/components/metric-card";
 import { ManagerNav } from "@/app/components/manager-nav";
+import { PayablesDonutChart } from "@/app/components/payables-donut-chart";
 import { getDbPool } from "@/lib/db";
 import {
   businessYearRange,
@@ -22,7 +23,10 @@ import {
   isValidBusinessYear,
 } from "@/lib/finance/dates";
 import { formatMoney } from "@/lib/finance/money";
-import { getFinanceSummary } from "@/lib/finance/report";
+import {
+  getFinanceSummary,
+  getFinanceTrend,
+} from "@/lib/finance/report";
 import { requirePermission } from "@/lib/auth/roles";
 
 export const instant = false;
@@ -66,7 +70,11 @@ export default async function DashboardPage({
       : month === currentMonth
         ? currentRange
         : businessMonthRange(month);
-  const summary = await getFinanceSummary(getDbPool(), range);
+  const pool = getDbPool();
+  const [summary, trend] = await Promise.all([
+    getFinanceSummary(pool, range),
+    getFinanceTrend(pool, range, period === "year" ? "month" : "day"),
+  ]);
 
   return (
     <main className="dashboard-page">
@@ -198,42 +206,37 @@ export default async function DashboardPage({
             <div className="section-heading">
               <div>
                 <p className="eyebrow">Vista financiera</p>
-                <h2>Ingresos y egresos</h2>
+                <h2>Evolución del período</h2>
               </div>
               <ChartNoAxesCombined aria-hidden="true" className="section-heading-icon" />
             </div>
-            <FinanceBarChart
-              items={[
-                { label: "Ventas", value: summary.salesTotal, tone: "red" },
-                {
-                  label: "Gastos incurridos",
-                  value: summary.expenseIncurred,
-                  tone: "dark",
-                },
-                {
-                  label: "Gastos pagados",
-                  value: summary.expensePaid,
-                  tone: "amber",
-                },
-              ]}
+            <FinanceTrendChart
+              granularity={period === "year" ? "month" : "day"}
+              points={trend}
             />
             <p className="chart-caption">
-              Los importes se comparan como referencia; no representan utilidad neta.
+              Compara Reporte Z neto, gastos incurridos y pagos de gastos por{" "}
+              {period === "year" ? "mes" : "día"}. No representa utilidad neta.
             </p>
           </section>
-          <section className="dashboard-card dashboard-note-card">
-            <span aria-hidden="true" className="note-icon">
-              <WalletCards size={20} />
-            </span>
-            <p className="eyebrow">Próximo paso</p>
-            <h2>Mantén tus cuentas al día</h2>
-            <p>
-              Revisa las facturas abiertas y sus fechas de vencimiento para
-              anticipar pagos.
+          <section className="dashboard-card payables-card">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Seguimiento</p>
+                <h2>Cuentas por pagar</h2>
+              </div>
+              <WalletCards aria-hidden="true" className="section-heading-icon" />
+            </div>
+            <PayablesDonutChart
+              outstanding={summary.outstandingPayables}
+              overdue={summary.overduePayables}
+            />
+            <p className="chart-caption payables-caption">
+              Saldo actual; no cambia con el período seleccionado.
             </p>
-            <a className="text-link" href="/dashboard/reports">
-              Ver informes <span aria-hidden="true">→</span>
-            </a>
+            <Link className="text-link payables-link" href="/dashboard/bills">
+              Revisar facturas <span aria-hidden="true">→</span>
+            </Link>
           </section>
         </div>
       </div>

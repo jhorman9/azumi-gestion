@@ -58,7 +58,20 @@ export async function POST(request: Request) {
   });
 
   if (!parsed.success) {
-    return redirectToUsers(request, "error=invalid");
+    const invalidField = parsed.error.issues.find((issue) =>
+      ["name", "email", "password", "role"].includes(
+        String(issue.path[0] ?? ""),
+      ),
+    )?.path[0];
+    const errorCode =
+      invalidField === "name" ||
+      invalidField === "email" ||
+      invalidField === "password" ||
+      invalidField === "role"
+        ? `invalid-${invalidField}`
+        : "invalid";
+
+    return redirectToUsers(request, `error=${errorCode}`);
   }
 
   const passwordHash = await bcrypt.hash(parsed.data.password, 12);

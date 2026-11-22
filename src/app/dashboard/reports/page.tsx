@@ -10,7 +10,7 @@ import {
   ReceiptText,
   WalletCards,
 } from "lucide-react";
-import { FinanceBarChart } from "@/app/components/finance-bar-chart";
+import { FinanceComparisonChart } from "@/app/components/finance-comparison-chart";
 import { MetricCard } from "@/app/components/metric-card";
 import { ManagerNav } from "@/app/components/manager-nav";
 import { getDbPool } from "@/lib/db";
@@ -383,7 +383,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
               {supplierTotal === 1 ? "proveedor" : "proveedores"}
             </span>
           </div>
-          <FinanceBarChart
+          <FinanceComparisonChart
             emptyMessage="No hay gastos por proveedor en este período."
             items={topSupplierRows.map((supplier, index) => ({
               label: supplier.supplier_name,

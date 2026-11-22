@@ -5,6 +5,12 @@ import {
   todayInPanama,
   type DateRange,
 } from "@/lib/finance/dates";
+import {
+  buildFinanceTrend,
+  type FinanceTrendAmount,
+  type FinanceTrendGranularity,
+  type FinanceTrendPoint,
+} from "@/lib/finance/trend";
 
 export interface FinanceSummary {
   salesTotal: string;
@@ -19,6 +25,53 @@ export interface FinanceSummary {
 interface AmountRow extends RowDataPacket {
   amount: string;
   overdue_amount?: string;
+}
+
+interface TrendRow extends RowDataPacket, FinanceTrendAmount {}
+
+export async function getFinanceTrend(
+  pool: Pool,
+  range: DateRange,
+  granularity: FinanceTrendGranularity,
+): Promise<FinanceTrendPoint[]> {
+  const { startUtc, endUtcExclusive } = businessRangeUtc(range.start, range.end);
+  const bucketFormat =
+    granularity === "day" ? "%Y-%m-%d" : "%Y-%m";
+  const [[salesRows], [incurredRows], [paidRows]] = await Promise.all([
+    pool.execute<TrendRow[]>(
+      `SELECT DATE_FORMAT(operation_date, ?) AS bucket,
+              COALESCE(SUM(reported_sales_total), 0.00) AS amount
+       FROM daily_closings
+       WHERE status IN ('confirmed', 'corrected')
+         AND operation_date BETWEEN ? AND ?
+       GROUP BY bucket`,
+      [bucketFormat, range.start, range.end],
+    ),
+    pool.execute<TrendRow[]>(
+      `SELECT DATE_FORMAT(incurred_on, ?) AS bucket,
+              COALESCE(SUM(amount), 0.00) AS amount
+       FROM expenses
+       WHERE status = 'paid'
+         AND incurred_on BETWEEN ? AND ?
+       GROUP BY bucket`,
+      [bucketFormat, range.start, range.end],
+    ),
+    pool.execute<TrendRow[]>(
+      `SELECT DATE_FORMAT(DATE_SUB(paid_at, INTERVAL 5 HOUR), ?) AS bucket,
+              COALESCE(SUM(amount), 0.00) AS amount
+       FROM expenses
+       WHERE status = 'paid'
+         AND paid_at >= ? AND paid_at < ?
+       GROUP BY bucket`,
+      [bucketFormat, startUtc, endUtcExclusive],
+    ),
+  ]);
+
+  return buildFinanceTrend(range, granularity, {
+    sales: salesRows,
+    expensesIncurred: incurredRows,
+    expensesPaid: paidRows,
+  });
 }
 
 export async function getFinanceSummary(

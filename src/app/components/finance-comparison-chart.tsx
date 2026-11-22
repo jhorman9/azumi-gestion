@@ -1,16 +1,23 @@
 import { formatMoney, moneyToCents } from "@/lib/finance/money";
 
-export interface FinanceBarItem {
+export interface FinanceComparisonItem {
   label: string;
   value: string;
   tone?: "red" | "dark" | "amber" | "green";
 }
 
-export function FinanceBarChart({
+const toneColors = {
+  red: "#b4232c",
+  dark: "#5e5651",
+  amber: "#d9942e",
+  green: "#43886a",
+} as const;
+
+export function FinanceComparisonChart({
   items,
   emptyMessage = "Todavía no hay importes para mostrar.",
 }: {
-  items: FinanceBarItem[];
+  items: FinanceComparisonItem[];
   emptyMessage?: string;
 }) {
   const maxAmount = items.reduce((largest, item) => {
@@ -19,7 +26,7 @@ export function FinanceBarChart({
   }, BigInt(0));
 
   return (
-    <div aria-label="Gráfico de importes" className="finance-bar-chart">
+    <div aria-label="Comparación de importes" className="comparison-chart">
       {items.length === 0 ? (
         <p className="empty-state">{emptyMessage}</p>
       ) : (
@@ -31,19 +38,22 @@ export function FinanceBarChart({
               : Number((amount * BigInt(10000)) / maxAmount) / 100;
 
           return (
-            <div className="finance-bar-row" key={item.label}>
-              <div className="finance-bar-label">
+            <div className="comparison-chart-row" key={item.label}>
+              <div className="comparison-chart-label">
                 <span>{item.label}</span>
                 <strong>{formatMoney(item.value)}</strong>
               </div>
               <div
                 aria-label={`${item.label}: ${formatMoney(item.value)}`}
-                className="finance-bar-track"
+                className="comparison-chart-track"
                 role="img"
               >
                 <span
-                  className={`finance-bar-fill finance-bar-${item.tone ?? "red"}`}
-                  style={{ width: `${width}%` }}
+                  className="comparison-chart-value"
+                  style={{
+                    width: `${width}%`,
+                    backgroundColor: toneColors[item.tone ?? "red"],
+                  }}
                 />
               </div>
             </div>
