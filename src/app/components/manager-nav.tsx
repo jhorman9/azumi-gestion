@@ -1,35 +1,148 @@
-import Link from "next/link";
+import {
+  CookingPot,
+  LogOut,
+  Store,
+} from "lucide-react";
+import { SidebarLink } from "@/app/components/sidebar-link";
 import { hasPermission } from "@/lib/auth/roles";
 import type { SessionUser } from "@/lib/auth/session";
 
-export function ManagerNav({ user }: { user: SessionUser }) {
+export function ManagerNav({
+  user,
+  previewMode = false,
+}: {
+  user: SessionUser;
+  previewMode?: boolean;
+}) {
+  const canReadDashboard = hasPermission(user.role, "dashboard:read");
+  const canReadClosings = hasPermission(user.role, "closings:read");
+  const canReadFinance = hasPermission(user.role, "finance:read");
+  const canManageMenu = hasPermission(user.role, "menu:manage");
+  const canManageUsers = hasPermission(user.role, "users:manage");
+
   return (
-    <header className="manager-header">
-      <div className="manager-identity">
-        <Link className="manager-brand" href="/dashboard">
-          CRM gerencial
-        </Link>
-        <span>
-          {user.name} · {user.role}
-        </span>
-      </div>
-      <nav aria-label="Navegación principal" className="manager-nav">
-        <Link href="/dashboard">Resumen</Link>
-        <Link href="/dashboard/closings">Cierres</Link>
-        <Link href="/dashboard/expenses">Gastos</Link>
-        <Link href="/dashboard/suppliers">Proveedores</Link>
-        <Link href="/dashboard/bills">Cuentas por pagar</Link>
-        <Link href="/dashboard/reports">Informes</Link>
-        <Link href="/dashboard/menu">Menú</Link>
-        {hasPermission(user.role, "users:manage") ? (
-          <Link href="/admin/users">Usuarios</Link>
-        ) : null}
-      </nav>
-      <form action="/api/auth/logout" method="post">
-        <button className="button-secondary" type="submit">
-          Cerrar sesión
-        </button>
-      </form>
-    </header>
+    <>
+      <aside className="manager-sidebar">
+        <div className="sidebar-brand">
+          <span aria-hidden="true" className="sidebar-brand-mark">
+            <CookingPot size={22} strokeWidth={1.8} />
+          </span>
+          <span className="sidebar-brand-copy">
+            <strong>AZUMI</strong>
+            <small>GESTIÓN</small>
+          </span>
+        </div>
+
+        <div className="sidebar-restaurant">
+          <span aria-hidden="true" className="restaurant-mark">
+            <Store size={17} />
+          </span>
+          <span>
+            <strong>Restaurante Azumi</strong>
+            <small>Panel administrativo</small>
+          </span>
+        </div>
+
+        <nav aria-label="Navegación principal" className="sidebar-navigation">
+          {canReadDashboard || canReadClosings || canReadFinance ? (
+            <div className="sidebar-nav-group">
+              <p className="sidebar-section-label">OPERACIÓN</p>
+              {canReadDashboard ? (
+                <SidebarLink href="/dashboard" icon="dashboard">
+                  Resumen
+                </SidebarLink>
+              ) : null}
+              {canReadClosings ? (
+                <SidebarLink href="/dashboard/closings" icon="closings">
+                  Cierres de caja
+                </SidebarLink>
+              ) : null}
+              {canReadFinance ? (
+                <SidebarLink href="/dashboard/expenses" icon="expenses">
+                  Gastos
+                </SidebarLink>
+              ) : null}
+            </div>
+          ) : null}
+
+          {canReadFinance ? (
+            <div className="sidebar-nav-group">
+              <p className="sidebar-section-label">FINANZAS</p>
+              <SidebarLink href="/dashboard/suppliers" icon="suppliers">
+                Proveedores
+              </SidebarLink>
+              <SidebarLink href="/dashboard/bills" icon="bills">
+                Cuentas por pagar
+              </SidebarLink>
+              <SidebarLink href="/dashboard/reports" icon="reports">
+                Informes
+              </SidebarLink>
+            </div>
+          ) : null}
+
+          {canManageMenu || canManageUsers ? (
+            <div className="sidebar-nav-group">
+              <p className="sidebar-section-label">ADMINISTRACIÓN</p>
+              {canManageMenu ? (
+                <SidebarLink href="/dashboard/menu" icon="menu">
+                  Menú digital
+                </SidebarLink>
+              ) : null}
+              {canManageUsers ? (
+                <SidebarLink href="/admin/users" icon="users">
+                  Usuarios
+                </SidebarLink>
+              ) : null}
+            </div>
+          ) : null}
+
+          {canReadFinance ? (
+            <div className="sidebar-nav-group">
+              <p className="sidebar-section-label">CONTROL</p>
+              <SidebarLink href="/dashboard/audit" icon="audit">
+                Auditoría
+              </SidebarLink>
+            </div>
+          ) : null}
+        </nav>
+
+        <div className="sidebar-footer">
+          <div aria-hidden="true" className="user-avatar">
+            {user.name
+              .split(/\s+/)
+              .slice(0, 2)
+              .map((part) => part[0]?.toUpperCase())
+              .join("")}
+          </div>
+          <div className="sidebar-user-copy">
+            <strong>{user.name}</strong>
+            <span>{user.role === "admin" ? "Administrador" : user.role}</span>
+          </div>
+          <form action="/api/auth/logout" method="post">
+            <button
+              aria-label="Cerrar sesión"
+              className="sidebar-logout"
+              title="Cerrar sesión"
+              disabled={previewMode}
+              type="submit"
+            >
+              <LogOut aria-hidden="true" size={18} />
+            </button>
+          </form>
+        </div>
+      </aside>
+
+      <header className="manager-topbar">
+        <div className="topbar-context">
+          <span>Azumi</span>
+          <span aria-hidden="true">/</span>
+          <strong>{previewMode ? "Vista de diseño" : "Centro de gestión"}</strong>
+        </div>
+        <div className="topbar-status">
+          <span aria-hidden="true" className="status-dot" />
+          {previewMode ? "Vista previa" : "Sesión segura"}
+        </div>
+      </header>
+    </>
   );
 }

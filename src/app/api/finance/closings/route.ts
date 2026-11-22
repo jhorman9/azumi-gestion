@@ -4,7 +4,14 @@ import type { PoolConnection } from "mysql2/promise";
 import { getCurrentUser } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/roles";
 import { writeAuditLog } from "@/lib/finance/audit";
-import { collectClosingFormFields } from "@/lib/finance/closing";
+import {
+  ClosingDeductionExceedsCashError,
+  refreshClosingExpenseDeduction,
+} from "@/lib/finance/closing-expenses";
+import {
+  calculateClosingTotals,
+  collectClosingFormFields,
+} from "@/lib/finance/closing";
 import { formFields } from "@/lib/finance/form";
 import { getDbPool } from "@/lib/db";
 import { hasSameOrigin } from "@/lib/security/origin";
@@ -48,6 +55,17 @@ export async function POST(request: Request) {
     return redirectToClosings(request, "error=invalid");
   }
 
+  const totals = calculateClosingTotals({
+    pedidosYaTotal: parsed.data.pedidos_ya_total,
+    cashTotal: parsed.data.cash_total,
+    channelPayments: parsed.data.channel_payments,
+    tips: parsed.data.tips,
+  });
+
+  if (!totals) {
+    return redirectToClosings(request, "error=invalid");
+  }
+
   let connection: PoolConnection | undefined;
   let transactionStarted = false;
 
@@ -59,14 +77,18 @@ export async function POST(request: Request) {
     const confirmed = parsed.data.action === "confirm";
     const [result] = await connection.execute<ResultSetHeader>(
       `INSERT INTO daily_closings
-        (operation_date, reported_sales_total, pedidos_ya_total, status, notes,
+        (operation_date, reported_sales_total, gross_reported_sales_total,
+         pedidos_ya_total, cash_total, gross_cash_total, status, notes,
          created_by, confirmed_by, confirmed_at, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, IF(? = 1, UTC_TIMESTAMP(3), NULL),
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, IF(? = 1, UTC_TIMESTAMP(3), NULL),
          UTC_TIMESTAMP(3), UTC_TIMESTAMP(3))`,
       [
         parsed.data.operation_date,
-        parsed.data.reported_sales_total,
+        totals.reportedSalesTotal,
+        totals.reportedSalesTotal,
         parsed.data.pedidos_ya_total,
+        parsed.data.cash_total,
+        parsed.data.cash_total,
         confirmed ? "confirmed" : "draft",
         parsed.data.notes,
         actor.id,
@@ -75,6 +97,12 @@ export async function POST(request: Request) {
       ],
     );
     const closingId = String(result.insertId);
+    const adjustedClosing = await refreshClosingExpenseDeduction(
+      connection,
+      parsed.data.operation_date,
+      actor.id,
+      false,
+    );
 
     for (const payment of parsed.data.channel_payments) {
       await connection.execute(
@@ -123,8 +151,13 @@ export async function POST(request: Request) {
       action: confirmed ? "confirmed" : "created",
       afterData: {
         operation_date: parsed.data.operation_date,
-        reported_sales_total: parsed.data.reported_sales_total,
+        reported_sales_total:
+          adjustedClosing?.reportedSalesTotal ?? totals.reportedSalesTotal,
+        gross_reported_sales_total: totals.reportedSalesTotal,
         pedidos_ya_total: parsed.data.pedidos_ya_total,
+        cash_total: adjustedClosing?.cashTotal ?? parsed.data.cash_total,
+        gross_cash_total: parsed.data.cash_total,
+        expense_deduction_total: adjustedClosing?.deductionTotal ?? "0.00",
         channel_payments: parsed.data.channel_payments,
         cash_outflows: parsed.data.cash_outflows,
         tips: parsed.data.tips,
@@ -157,6 +190,10 @@ export async function POST(request: Request) {
 
     if (code === "ER_DUP_ENTRY") {
       return redirectToClosings(request, "error=duplicate");
+    }
+
+    if (error instanceof ClosingDeductionExceedsCashError) {
+      return redirectToClosings(request, "error=deduction-exceeds-cash");
     }
 
     console.error(`Daily closing creation failed (${code}).`);

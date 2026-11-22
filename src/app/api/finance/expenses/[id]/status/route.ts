@@ -4,6 +4,7 @@ import type { PoolConnection } from "mysql2/promise";
 import { getCurrentUser } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/roles";
 import { writeAuditLog } from "@/lib/finance/audit";
+import { refreshClosingExpenseDeduction } from "@/lib/finance/closing-expenses";
 import { formFields } from "@/lib/finance/form";
 import { getDbPool } from "@/lib/db";
 import { hasSameOrigin } from "@/lib/security/origin";
@@ -11,9 +12,13 @@ import { expenseStatusSchema } from "@/lib/validation/finance";
 
 interface ExpenseRow extends RowDataPacket {
   id: string | number;
-  status: "unpaid" | "paid" | "void";
+  supplier_id: string | number;
+  incurred_on: string;
   amount: string;
-  payment_method: string | null;
+  payment_method: "cash" | "card" | "yappy";
+  deduct_from_closing: number;
+  closing_operation_date: string | null;
+  status: "paid" | "void";
 }
 
 function redirectToExpenses(request: Request, result: string) {
@@ -32,23 +37,19 @@ export async function POST(
   }
 
   const actor = await getCurrentUser();
-
   if (!actor) {
     return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   }
-
   if (!hasPermission(actor.role, "finance:write")) {
     return NextResponse.json({ error: "Acceso denegado." }, { status: 403 });
   }
 
   const { id } = await context.params;
-
   if (!/^[1-9]\d{0,19}$/.test(id)) {
     return NextResponse.json({ error: "Gasto no válido." }, { status: 400 });
   }
 
   let formData: FormData;
-
   try {
     formData = await request.formData();
   } catch {
@@ -56,12 +57,7 @@ export async function POST(
   }
 
   const parsed = expenseStatusSchema.safeParse(formFields(formData));
-
-  if (
-    !parsed.success ||
-    (parsed.data.action === "pay" && !parsed.data.payment_method) ||
-    (parsed.data.action === "void" && parsed.data.payment_method)
-  ) {
+  if (!parsed.success) {
     return redirectToExpenses(request, "error=invalid");
   }
 
@@ -73,7 +69,10 @@ export async function POST(
     await connection.beginTransaction();
     transactionStarted = true;
     const [rows] = await connection.execute<ExpenseRow[]>(
-      `SELECT id, status, amount, payment_method
+      `SELECT id, supplier_id, DATE_FORMAT(incurred_on, '%Y-%m-%d') AS incurred_on,
+              amount, payment_method, deduct_from_closing,
+              DATE_FORMAT(closing_operation_date, '%Y-%m-%d') AS closing_operation_date,
+              status
        FROM expenses
        WHERE id = ?
        FOR UPDATE`,
@@ -87,46 +86,45 @@ export async function POST(
       return redirectToExpenses(request, "error=not-found");
     }
 
-    if (expense.status !== "unpaid") {
+    if (expense.status !== "paid") {
       await connection.rollback();
       transactionStarted = false;
       return redirectToExpenses(request, "error=locked");
     }
 
-    const newStatus = parsed.data.action === "pay" ? "paid" : "void";
-    const paymentMethod =
-      parsed.data.action === "pay" ? parsed.data.payment_method : null;
     await connection.execute(
       `UPDATE expenses
-       SET status = ?, payment_method = ?,
-           paid_at = IF(? = 1, UTC_TIMESTAMP(3), NULL),
-           voided_at = IF(? = 1, UTC_TIMESTAMP(3), NULL),
+       SET status = 'void', voided_at = UTC_TIMESTAMP(3),
            updated_at = UTC_TIMESTAMP(3)
        WHERE id = ?`,
-      [
-        newStatus,
-        paymentMethod,
-        newStatus === "paid" ? 1 : 0,
-        newStatus === "void" ? 1 : 0,
-        id,
-      ],
+      [id],
     );
+
+    if (expense.deduct_from_closing && expense.closing_operation_date) {
+      await refreshClosingExpenseDeduction(
+        connection,
+        expense.closing_operation_date,
+        actor.id,
+      );
+    }
+
     await writeAuditLog(connection, {
       actorUserId: actor.id,
       entityType: "expense",
       entityId: id,
-      action: newStatus === "paid" ? "paid" : "voided",
+      action: "voided",
       beforeData: {
-        status: expense.status,
+        supplier_id: expense.supplier_id,
+        incurred_on: expense.incurred_on,
         amount: expense.amount,
         payment_method: expense.payment_method,
+        deduct_from_closing: Boolean(expense.deduct_from_closing),
+        closing_operation_date: expense.closing_operation_date,
+        status: expense.status,
       },
-      afterData: {
-        status: newStatus,
-        amount: expense.amount,
-        payment_method: paymentMethod,
-      },
+      afterData: { status: "void" },
     });
+
     await connection.commit();
     transactionStarted = false;
     return redirectToExpenses(request, "updated=1");

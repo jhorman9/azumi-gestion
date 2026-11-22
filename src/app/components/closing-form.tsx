@@ -21,10 +21,9 @@ interface ClosingFormProps {
 
 function initialTotals(initial: ClosingFormDefaults) {
   return calculateClosingTotals({
-    reportedSalesTotal: initial.reported_sales_total,
     pedidosYaTotal: initial.pedidos_ya_total,
+    cashTotal: initial.cash_total,
     channelPayments: initial.channelPayments,
-    cashOutflows: initial.cashOutflows,
     tips: initial.tips,
   });
 }
@@ -53,10 +52,9 @@ export function ClosingForm({
     const values = collectClosingFormFields(fields);
     setTotals(
       calculateClosingTotals({
-        reportedSalesTotal: values.reported_sales_total,
         pedidosYaTotal: values.pedidos_ya_total,
+        cashTotal: values.cash_total,
         channelPayments: values.channel_payments,
-        cashOutflows: values.cash_outflows,
         tips: values.tips,
       }),
     );
@@ -81,22 +79,22 @@ export function ClosingForm({
           />
         </label>
         <label>
-          Total Reporte Z
+          Pedidos Ya
           <input
-            defaultValue={initial.reported_sales_total}
+            defaultValue={initial.pedidos_ya_total}
             min="0"
-            name="reported_sales_total"
+            name="pedidos_ya_total"
             required
             step="0.01"
             type="number"
           />
         </label>
         <label>
-          Pedidos Ya
+          Efectivo (Total Dinero)
           <input
-            defaultValue={initial.pedidos_ya_total}
+            defaultValue={initial.cash_total}
             min="0"
-            name="pedidos_ya_total"
+            name="cash_total"
             required
             step="0.01"
             type="number"
@@ -235,9 +233,9 @@ export function ClosingForm({
 
       <section aria-label="Totales calculados" className="closing-totals">
         <article>
-          <h3>Total Ventas</h3>
-          <p>{totals ? formatMoney(totals.salesTotal) : "—"}</p>
-          <span>Reporte Z + Pedidos Ya</span>
+          <h3>Total antes de gastos</h3>
+          <p>{totals ? formatMoney(totals.reportedSalesTotal) : "—"}</p>
+          <span>Reporte Z bruto: efectivo + banco + Pedidos Ya</span>
         </article>
         <article>
           <h3>Total Banco</h3>
@@ -245,9 +243,9 @@ export function ClosingForm({
           <span>Suma de las 10 celdas del desglose</span>
         </article>
         <article>
-          <h3>Total Dinero</h3>
+          <h3>Efectivo</h3>
           <p>{totals ? formatMoney(totals.cashTotal) : "—"}</p>
-          <span>Reporte Z + Pedidos Ya − salidas de caja</span>
+          <span>Importe contado antes de gastos asignados a este cierre</span>
         </article>
         <article>
           <h3>Total Propinas</h3>

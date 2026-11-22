@@ -49,6 +49,7 @@ export interface ClosingFormDefaults {
   operation_date: string;
   reported_sales_total: string;
   pedidos_ya_total: string;
+  cash_total: string;
   channelPayments: ClosingPayment[];
   cashOutflows: CashOutflow[];
   tips: ClosingTip[];
@@ -56,15 +57,14 @@ export interface ClosingFormDefaults {
 }
 
 export interface ClosingTotalsInput {
-  reportedSalesTotal: string;
   pedidosYaTotal: string;
+  cashTotal: string;
   channelPayments: readonly Pick<ClosingPayment, "amount">[];
-  cashOutflows: readonly Pick<CashOutflow, "amount">[];
   tips: readonly Pick<ClosingTip, "amount">[];
 }
 
 export interface ClosingTotals {
-  salesTotal: string;
+  reportedSalesTotal: string;
   bankTotal: string;
   cashTotal: string;
   tipsTotal: string;
@@ -74,8 +74,8 @@ export function collectClosingFormFields(fields: Record<string, string>) {
   return {
     action: fields.action ?? "",
     operation_date: fields.operation_date ?? "",
-    reported_sales_total: fields.reported_sales_total ?? "",
     pedidos_ya_total: fields.pedidos_ya_total ?? "",
+    cash_total: fields.cash_total ?? "",
     notes: fields.notes ?? "",
     correction_reason: fields.correction_reason ?? "",
     channel_payments: closingPaymentTypes.flatMap((paymentType) =>
@@ -119,21 +119,17 @@ function centsToMoney(value: bigint): string {
 export function calculateClosingTotals(
   input: ClosingTotalsInput,
 ): ClosingTotals | null {
-  const reportedSales = parseCents(input.reportedSalesTotal);
   const pedidosYa = parseCents(input.pedidosYaTotal);
+  const cash = parseCents(input.cashTotal);
   const channelAmounts = input.channelPayments.map((payment) =>
     parseCents(payment.amount),
-  );
-  const outflowAmounts = input.cashOutflows.map((outflow) =>
-    parseCents(outflow.amount),
   );
   const tipAmounts = input.tips.map((tip) => parseCents(tip.amount));
 
   if (
-    reportedSales === null ||
     pedidosYa === null ||
+    cash === null ||
     channelAmounts.some((amount) => amount === null) ||
-    outflowAmounts.some((amount) => amount === null) ||
     tipAmounts.some((amount) => amount === null)
   ) {
     return null;
@@ -142,18 +138,10 @@ export function calculateClosingTotals(
   const validChannelAmounts = channelAmounts.filter(
     (amount): amount is bigint => amount !== null,
   );
-  const validOutflowAmounts = outflowAmounts.filter(
-    (amount): amount is bigint => amount !== null,
-  );
   const validTipAmounts = tipAmounts.filter(
     (amount): amount is bigint => amount !== null,
   );
-  const salesTotal = reportedSales + pedidosYa;
   const bankTotal = validChannelAmounts.reduce(
-    (total, amount) => total + amount,
-    BigInt(0),
-  );
-  const outflowTotal = validOutflowAmounts.reduce(
     (total, amount) => total + amount,
     BigInt(0),
   );
@@ -161,11 +149,12 @@ export function calculateClosingTotals(
     (total, amount) => total + amount,
     BigInt(0),
   );
+  const reportedSales = cash + bankTotal + pedidosYa;
 
   return {
-    salesTotal: centsToMoney(salesTotal),
+    reportedSalesTotal: centsToMoney(reportedSales),
     bankTotal: centsToMoney(bankTotal),
-    cashTotal: centsToMoney(salesTotal - outflowTotal),
+    cashTotal: centsToMoney(cash),
     tipsTotal: centsToMoney(tipsTotal),
   };
 }
@@ -177,6 +166,7 @@ export function emptyClosingFormDefaults(
     operation_date: operationDate,
     reported_sales_total: "0.00",
     pedidos_ya_total: "0.00",
+    cash_total: "0.00",
     channelPayments: closingPaymentTypes.flatMap((paymentType) =>
       closingPaymentChannels.map((paymentChannel) => ({
         payment_type: paymentType,

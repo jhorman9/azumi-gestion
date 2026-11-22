@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "CRM Gerencial",
-  description: "Administración interna del restaurante",
+  title: "Azumi | Panel administrativo",
+  description: "Gestión interna del restaurante Azumi",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

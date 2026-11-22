@@ -36,7 +36,7 @@ export async function getFinanceSummary(
     [payableRows],
   ] = await Promise.all([
     pool.execute<AmountRow[]>(
-      `SELECT COALESCE(SUM(reported_sales_total + pedidos_ya_total), 0.00) AS amount
+      `SELECT COALESCE(SUM(reported_sales_total), 0.00) AS amount
        FROM daily_closings
        WHERE status IN ('confirmed', 'corrected')
          AND operation_date BETWEEN ? AND ?`,
@@ -45,7 +45,7 @@ export async function getFinanceSummary(
     pool.execute<AmountRow[]>(
       `SELECT COALESCE(SUM(amount), 0.00) AS amount
        FROM expenses
-       WHERE status IN ('unpaid', 'paid')
+       WHERE status = 'paid'
          AND incurred_on BETWEEN ? AND ?`,
       [range.start, range.end],
     ),

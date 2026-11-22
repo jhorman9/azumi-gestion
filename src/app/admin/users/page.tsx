@@ -1,5 +1,6 @@
 import { connection } from "next/server";
 import type { RowDataPacket } from "mysql2";
+import { ManagerNav } from "@/app/components/manager-nav";
 import { getDbPool } from "@/lib/db";
 import { requirePermission } from "@/lib/auth/roles";
 
@@ -47,119 +48,140 @@ export default async function AdminUsersPage({
 
   return (
     <main className="dashboard-page">
-      <header className="dashboard-header">
-        <div>
-          <p className="eyebrow">Administración</p>
-          <h1>Usuarios</h1>
+      <ManagerNav user={actor} />
+      <div className="page-content">
+        <div className="page-heading">
+          <div>
+            <p className="eyebrow">Administración</p>
+            <h1>Usuarios</h1>
+            <p className="page-heading-subtitle">
+              Administra el acceso y los roles del equipo.
+            </p>
+          </div>
         </div>
-        <a className="button-secondary text-link" href="/dashboard">
-          Volver al inicio
-        </a>
-      </header>
 
-      {params.created || params.updated ? (
-        <p className="success-message" role="status">
-          Cambios guardados.
-        </p>
-      ) : null}
-      {errorMessage ? (
-        <p className="form-error" role="alert">
-          {errorMessage}
-        </p>
-      ) : null}
+        {params.created || params.updated ? (
+          <p className="success-message" role="status">
+            Cambios guardados.
+          </p>
+        ) : null}
+        {errorMessage ? (
+          <p className="form-error" role="alert">
+            {errorMessage}
+          </p>
+        ) : null}
 
-      <section className="dashboard-card">
-        <h2>Crear cuenta</h2>
-        <form action="/api/admin/users" method="post" className="auth-form">
-          <label>
-            Nombre
-            <input autoComplete="name" maxLength={120} name="name" required />
-          </label>
-          <label>
-            Correo electrónico
-            <input
-              autoComplete="email"
-              maxLength={190}
-              name="email"
-              required
-              type="email"
-            />
-          </label>
-          <label>
-            Contraseña temporal (mínimo 12 caracteres)
-            <input
-              autoComplete="new-password"
-              maxLength={72}
-              name="password"
-              required
-              type="password"
-            />
-          </label>
-          <label>
-            Rol
-            <select defaultValue="manager" name="role">
-              <option value="admin">Administrador</option>
-              <option value="manager">Gerente</option>
-              <option value="menu_editor">Editor de menú</option>
-            </select>
-          </label>
-          <button type="submit">Crear usuario</button>
-        </form>
-      </section>
+        <section className="dashboard-card">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Equipo</p>
+              <h2>Crear cuenta</h2>
+            </div>
+          </div>
+          <form action="/api/admin/users" method="post" className="finance-form">
+            <div className="form-grid">
+              <label>
+                Nombre
+                <input
+                  autoComplete="name"
+                  maxLength={120}
+                  name="name"
+                  required
+                />
+              </label>
+              <label>
+                Correo electrónico
+                <input
+                  autoComplete="email"
+                  maxLength={190}
+                  name="email"
+                  required
+                  type="email"
+                />
+              </label>
+              <label>
+                Contraseña temporal (mínimo 12 caracteres)
+                <input
+                  autoComplete="new-password"
+                  maxLength={72}
+                  name="password"
+                  required
+                  type="password"
+                />
+              </label>
+              <label>
+                Rol
+                <select defaultValue="manager" name="role">
+                  <option value="admin">Administrador</option>
+                  <option value="manager">Gerente</option>
+                  <option value="menu_editor">Editor de menú</option>
+                </select>
+              </label>
+            </div>
+            <button type="submit">Crear usuario</button>
+          </form>
+        </section>
 
-      <section className="dashboard-card">
-        <h2>Cuentas existentes</h2>
-        <div className="table-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">Nombre</th>
-                <th scope="col">Correo</th>
-                <th scope="col">Rol</th>
-                <th scope="col">Estado</th>
-                <th scope="col">Acción</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => {
-                const isActive = Boolean(row.is_active);
-                const isCurrentUser = String(row.id) === actor.id;
+        <section className="dashboard-card">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Acceso</p>
+              <h2>Cuentas existentes</h2>
+            </div>
+            <span className="table-count">{rows.length} usuarios</span>
+          </div>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Nombre</th>
+                  <th scope="col">Correo</th>
+                  <th scope="col">Rol</th>
+                  <th scope="col">Estado</th>
+                  <th scope="col">Acción</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => {
+                  const isActive = Boolean(row.is_active);
+                  const isCurrentUser = String(row.id) === actor.id;
 
-                return (
-                  <tr key={String(row.id)}>
-                    <td>{row.name}</td>
-                    <td>{row.email}</td>
-                    <td>{row.user_role}</td>
-                    <td>{isActive ? "Activo" : "Inactivo"}</td>
-                    <td>
-                      {isCurrentUser ? (
-                        "Tu cuenta"
-                      ) : (
-                        <form
-                          action={`/api/admin/users/${encodeURIComponent(String(row.id))}/status`}
-                          method="post"
-                        >
-                          <input
-                            name="is_active"
-                            type="hidden"
-                            value={isActive ? "0" : "1"}
-                          />
-                          <button
-                            className="button-secondary"
-                            type="submit"
+                  return (
+                    <tr key={String(row.id)}>
+                      <td>{row.name}</td>
+                      <td>{row.email}</td>
+                      <td>{row.user_role}</td>
+                      <td>{isActive ? "Activo" : "Inactivo"}</td>
+                      <td>
+                        {isCurrentUser ? (
+                          "Tu cuenta"
+                        ) : (
+                          <form
+                            action={`/api/admin/users/${encodeURIComponent(String(row.id))}/status`}
+                            method="post"
                           >
-                            {isActive ? "Desactivar" : "Activar"}
-                          </button>
-                        </form>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </section>
+                            <input
+                              name="is_active"
+                              type="hidden"
+                              value={isActive ? "0" : "1"}
+                            />
+                            <button
+                              className="button-secondary"
+                              type="submit"
+                            >
+                              {isActive ? "Desactivar" : "Activar"}
+                            </button>
+                          </form>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
     </main>
   );
 }

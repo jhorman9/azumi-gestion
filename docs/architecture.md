@@ -42,16 +42,17 @@ ruta y mutación deberá validar la sesión y el permiso en el servidor.
   `DATE` y los cambios de confirmación/corrección quedan auditados.
 - Los cierres se guardan como borradores o se confirman; corregir un cierre
   confirmado exige un motivo y conserva el antes/después en la auditoría.
-- El cierre conserva por separado `reported_sales_total` (Reporte Z) y
-  `pedidos_ya_total` (Pedidos Ya). El total de ventas es Reporte Z + Pedidos Ya;
-  Pedidos Ya no forma parte del desglose de Reporte Z.
+- El cierre conserva `reported_sales_total` como Total Ventas / Reporte Z y
+  registra `pedidos_ya_total` por separado. Reporte Z se calcula como Efectivo
+  + Total Banco + Pedidos Ya.
 - La matriz de Tarjeta de crédito/Clave por Punto de Venta, BAC, Banesco, Yappy
   y ACH desglosa Reporte Z, no representa ventas adicionales. Total Banco es la
-  suma de sus diez celdas.
-- Total Dinero se calcula como Reporte Z + Pedidos Ya − salidas de caja. Las
-  salidas conservan descripción e importe en el cierre y no crean gastos. Las
-  propinas se guardan por persona e importe; su total es calculado. “Realizado
-  por” corresponde al usuario autenticado que creó el cierre.
+  suma de sus diez celdas y no vuelve a sumarse fuera del desglose.
+- El efectivo se captura en el campo `cash_total` como monto contado/registrado;
+  no se calcula restando banco ni salidas. Las salidas conservan descripción e
+  importe en el cierre y no crean gastos. Las propinas se guardan por persona e
+  importe; su total es calculado por separado y no se suma a ventas ni banco.
+  “Realizado por” corresponde al usuario autenticado que creó el cierre.
 - La migración del formato PDF conserva los cierres y sus datos genéricos
   históricos; no los convierte a la matriz nueva por no existir una equivalencia
   contable fiable.

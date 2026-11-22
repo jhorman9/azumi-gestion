@@ -1,6 +1,6 @@
 import { connection } from "next/server";
 import { ManagerNav } from "@/app/components/manager-nav";
-import { hasPermission, requirePermission } from "@/lib/auth/roles";
+import { requirePermission } from "@/lib/auth/roles";
 
 export const instant = false;
 
@@ -10,25 +10,23 @@ export default async function MenuHomePage() {
 
   return (
     <main className="dashboard-page">
-      {hasPermission(user.role, "finance:read") ? (
-        <ManagerNav user={user} />
-      ) : (
-        <header className="dashboard-header">
+      <ManagerNav user={user} />
+      <div className="page-content">
+        <div className="page-heading">
           <div>
             <p className="eyebrow">Administración del menú</p>
-            <h1>Hola, {user.name}</h1>
+            <h1>Menú digital</h1>
+            <p className="page-heading-subtitle">
+              Organiza la oferta que ve tu equipo y tus clientes.
+            </p>
           </div>
-          <form action="/api/auth/logout" method="post">
-            <button className="button-secondary" type="submit">
-              Cerrar sesión
-            </button>
-          </form>
-        </header>
-      )}
-      <section className="dashboard-card">
-        <h2>Menú digital</h2>
-        <p>La gestión de categorías y productos corresponde a la Fase 2.</p>
-      </section>
+        </div>
+        <section className="dashboard-card dashboard-note-card">
+          <p className="eyebrow">Próximamente</p>
+          <h2>Tu menú, en un solo lugar</h2>
+          <p>La gestión de categorías y productos corresponde a la Fase 2.</p>
+        </section>
+      </div>
     </main>
   );
 }

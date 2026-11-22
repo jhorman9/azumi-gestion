@@ -4,6 +4,10 @@ import type { PoolConnection } from "mysql2/promise";
 import { getCurrentUser } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/roles";
 import { writeAuditLog } from "@/lib/finance/audit";
+import {
+  ClosingDeductionExceedsCashError,
+  refreshClosingExpenseDeduction,
+} from "@/lib/finance/closing-expenses";
 import { formFields } from "@/lib/finance/form";
 import { getDbPool } from "@/lib/db";
 import { hasSameOrigin } from "@/lib/security/origin";
@@ -56,59 +60,52 @@ export async function POST(request: Request) {
     connection = await getDbPool().getConnection();
     await connection.beginTransaction();
     transactionStarted = true;
-    const [categories] = await connection.execute<ActiveRow[]>(
+    const [suppliers] = await connection.execute<ActiveRow[]>(
       `SELECT id
-       FROM expense_categories
+       FROM suppliers
        WHERE id = ? AND is_active = 1
        FOR UPDATE`,
-      [parsed.data.category_id],
+      [parsed.data.supplier_id],
     );
 
-    if (!categories[0]) {
+    if (!suppliers[0]) {
       await connection.rollback();
       transactionStarted = false;
-      return redirectToExpenses(request, "error=category-required");
-    }
-
-    if (parsed.data.supplier_id) {
-      const [suppliers] = await connection.execute<ActiveRow[]>(
-        `SELECT id
-         FROM suppliers
-         WHERE id = ? AND is_active = 1
-         FOR UPDATE`,
-        [parsed.data.supplier_id],
-      );
-
-      if (!suppliers[0]) {
-        await connection.rollback();
-        transactionStarted = false;
-        return redirectToExpenses(request, "error=invalid");
-      }
+      return redirectToExpenses(request, "error=invalid");
     }
 
     const [result] = await connection.execute<ResultSetHeader>(
       `INSERT INTO expenses
-        (category_id, supplier_id, expense_type, incurred_on, due_on, amount,
-         description, status, payment_method, paid_at, voided_at, created_by,
+        (supplier_id, incurred_on, amount, payment_method, deduct_from_closing,
+         closing_operation_date, status, paid_at, voided_at, created_by,
          created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 
-         CASE WHEN ? = 1 THEN UTC_TIMESTAMP(3) ELSE NULL END,
-         NULL, ?, UTC_TIMESTAMP(3), UTC_TIMESTAMP(3))`,
+       VALUES (?, ?, ?, ?, ?, ?, 'paid', UTC_TIMESTAMP(3), NULL, ?,
+         UTC_TIMESTAMP(3), UTC_TIMESTAMP(3))`,
       [
-        parsed.data.category_id,
         parsed.data.supplier_id,
-        parsed.data.expense_type,
         parsed.data.incurred_on,
-        parsed.data.due_on,
         parsed.data.amount,
-        parsed.data.description,
-        parsed.data.status,
         parsed.data.payment_method,
-        parsed.data.status === "paid" ? 1 : 0,
+        parsed.data.deduct_from_closing ? 1 : 0,
+        parsed.data.deduct_from_closing
+          ? parsed.data.closing_operation_date
+          : null,
         actor.id,
       ],
     );
     const expenseId = String(result.insertId);
+
+    if (
+      parsed.data.deduct_from_closing &&
+      parsed.data.closing_operation_date
+    ) {
+      await refreshClosingExpenseDeduction(
+        connection,
+        parsed.data.closing_operation_date,
+        actor.id,
+      );
+    }
+
     await writeAuditLog(connection, {
       actorUserId: actor.id,
       entityType: "expense",
@@ -116,6 +113,9 @@ export async function POST(request: Request) {
       action: "created",
       afterData: {
         ...parsed.data,
+        closing_operation_date: parsed.data.deduct_from_closing
+          ? parsed.data.closing_operation_date
+          : null,
       },
     });
     await connection.commit();
@@ -128,6 +128,10 @@ export async function POST(request: Request) {
       } catch {
         console.error("Expense rollback failed.");
       }
+    }
+
+    if (error instanceof ClosingDeductionExceedsCashError) {
+      return redirectToExpenses(request, "error=deduction-exceeds-cash");
     }
 
     const code =

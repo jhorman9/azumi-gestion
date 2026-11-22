@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 import type { RowDataPacket } from "mysql2";
+import { AuditLabel } from "@/app/components/audit-label";
 import { ClosingForm } from "@/app/components/closing-form";
 import { ManagerNav } from "@/app/components/manager-nav";
 import { getDbPool } from "@/lib/db";
@@ -16,7 +17,12 @@ interface ClosingRow extends RowDataPacket {
   operation_date: string;
   reported_sales_total: string;
   pedidos_ya_total: string;
-  sales_total: string;
+  cash_total: string;
+  bank_total: string;
+  expense_deduction_total: string;
+  last_action: string | null;
+  last_actor_name: string | null;
+  last_action_at: string | null;
   status: "draft" | "confirmed" | "corrected";
 }
 
@@ -30,6 +36,8 @@ interface ClosingsPageProps {
 const errorMessages: Record<string, string> = {
   invalid: "Revisa los datos del cierre.",
   duplicate: "Ya existe un cierre para esa fecha.",
+  "deduction-exceeds-cash":
+    "Los gastos descontados superan el efectivo registrado para este cierre.",
   failed: "No fue posible guardar el cierre.",
 };
 
@@ -49,11 +57,34 @@ export default async function ClosingsPage({
   await connection();
   const user = await requirePermission("closings:read");
   const [closings] = await getDbPool().execute<ClosingRow[]>(
-    `SELECT id, DATE_FORMAT(operation_date, '%Y-%m-%d') AS operation_date,
-            reported_sales_total, pedidos_ya_total,
-            reported_sales_total + pedidos_ya_total AS sales_total, status
-     FROM daily_closings
-     ORDER BY operation_date DESC
+    `SELECT c.id, DATE_FORMAT(c.operation_date, '%Y-%m-%d') AS operation_date,
+            c.reported_sales_total, c.pedidos_ya_total, c.cash_total,
+          COALESCE((
+            SELECT SUM(e.amount)
+            FROM expenses e
+            WHERE e.closing_operation_date = c.operation_date
+              AND e.deduct_from_closing = 1
+              AND e.status = 'paid'
+          ), 0.00) AS expense_deduction_total,
+            COALESCE((
+              SELECT SUM(p.amount)
+              FROM daily_closing_channel_payments p
+              WHERE p.daily_closing_id = c.id
+            ), 0.00) AS bank_total,
+          a.action AS last_action,
+          au.name AS last_actor_name,
+          DATE_FORMAT(a.created_at, '%Y-%m-%dT%H:%i:%sZ') AS last_action_at,
+            c.status
+     FROM daily_closings c
+     LEFT JOIN (
+       SELECT entity_id, MAX(id) AS audit_id
+       FROM audit_logs
+       WHERE entity_type = 'daily_closing'
+       GROUP BY entity_id
+     ) latest ON latest.entity_id = CAST(c.id AS CHAR)
+     LEFT JOIN audit_logs a ON a.id = latest.audit_id
+     LEFT JOIN users au ON au.id = a.actor_user_id
+     ORDER BY c.operation_date DESC
      LIMIT 90`,
   );
   const params = await searchParams;
@@ -72,7 +103,8 @@ export default async function ClosingsPage({
           </div>
           <p>
             Registra el Reporte Z, Pedidos Ya, el desglose bancario, las salidas
-            de caja y las propinas.
+            de caja y las propinas. Los gastos asignados a un cierre aparecen
+            como una resta de su total.
           </p>
         </div>
 
@@ -108,10 +140,13 @@ export default async function ClosingsPage({
                 <thead>
                   <tr>
                     <th scope="col">Fecha</th>
-                    <th scope="col">Reporte Z</th>
+                    <th scope="col">Reporte Z neto</th>
                     <th scope="col">Pedidos Ya</th>
-                    <th scope="col">Total ventas</th>
+                    <th scope="col">Total banco</th>
+                    <th scope="col">Efectivo neto</th>
+                    <th scope="col">Gastos restados</th>
                     <th scope="col">Estado</th>
+                    <th scope="col">Último cambio</th>
                     <th scope="col">Detalle</th>
                   </tr>
                 </thead>
@@ -121,8 +156,17 @@ export default async function ClosingsPage({
                       <td>{closing.operation_date}</td>
                       <td>{formatMoney(closing.reported_sales_total)}</td>
                       <td>{formatMoney(closing.pedidos_ya_total)}</td>
-                      <td>{formatMoney(closing.sales_total)}</td>
+                      <td>{formatMoney(closing.bank_total)}</td>
+                      <td>{formatMoney(closing.cash_total)}</td>
+                      <td>{formatMoney(closing.expense_deduction_total)}</td>
                       <td>{statusLabels[closing.status]}</td>
+                      <td>
+                        <AuditLabel
+                          action={closing.last_action}
+                          actorName={closing.last_actor_name}
+                          occurredAt={closing.last_action_at}
+                        />
+                      </td>
                       <td>
                         <Link href={`/dashboard/closings/${closing.id}`}>
                           Abrir cierre

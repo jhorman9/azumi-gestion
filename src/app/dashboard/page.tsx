@@ -1,4 +1,16 @@
 import { connection } from "next/server";
+import {
+  ChartNoAxesCombined,
+  CircleAlert,
+  CircleDollarSign,
+  CircleCheck,
+  FileText,
+  HandCoins,
+  ReceiptText,
+  WalletCards,
+} from "lucide-react";
+import { FinanceBarChart } from "@/app/components/finance-bar-chart";
+import { MetricCard } from "@/app/components/metric-card";
 import { ManagerNav } from "@/app/components/manager-nav";
 import { getDbPool } from "@/lib/db";
 import { currentMonthInPanama } from "@/lib/finance/dates";
@@ -21,60 +33,108 @@ export default async function DashboardPage() {
         <div className="page-heading">
           <div>
             <p className="eyebrow">Resumen gerencial</p>
-            <h1>Este mes</h1>
+            <h1>Buenos días</h1>
+            <p className="page-heading-subtitle">
+              Aquí tienes el panorama de tu restaurante este mes.
+            </p>
           </div>
-          <p>
-            {range.start} al {range.end} · {user.email}
-          </p>
+          <span className="date-range-pill">
+            {range.start} <span aria-hidden="true">—</span> {range.end}
+          </span>
         </div>
         <section aria-label="Indicadores del mes" className="metric-grid">
-          <article className="metric-card">
-            <h2>Ventas totales</h2>
-            <p>{formatMoney(summary.salesTotal)}</p>
-            <span>Solo cierres confirmados o corregidos</span>
-          </article>
-          <article className="metric-card">
-            <h2>Gastos incurridos</h2>
-            <p>{formatMoney(summary.expenseIncurred)}</p>
-            <span>Excluye gastos anulados</span>
-          </article>
-          <article className="metric-card">
-            <h2>Gastos pagados</h2>
-            <p>{formatMoney(summary.expensePaid)}</p>
-            <span>Según fecha efectiva de pago</span>
-          </article>
-          <article className="metric-card">
-            <h2>Facturas emitidas</h2>
-            <p>{formatMoney(summary.supplierBillsIssued)}</p>
-            <span>No se vuelven a contar como gastos</span>
-          </article>
-          <article className="metric-card">
-            <h2>Pagos a proveedores</h2>
-            <p>{formatMoney(summary.supplierPayments)}</p>
-            <span>Pagos registrados durante el mes</span>
-          </article>
-          <article className="metric-card">
-            <h2>Saldo por pagar</h2>
-            <p>{formatMoney(summary.outstandingPayables)}</p>
-            <span>Facturas abiertas con saldo pendiente</span>
-          </article>
-          <article className="metric-card">
-            <h2>Saldo vencido</h2>
-            <p>{formatMoney(summary.overduePayables)}</p>
-            <span>Facturas vencidas a la fecha local</span>
-          </article>
+          <MetricCard
+            hint="Cierres confirmados después de gastos descontados"
+            icon={CircleDollarSign}
+            label="Reporte Z neto del período"
+            tone="red"
+            value={formatMoney(summary.salesTotal)}
+          />
+          <MetricCard
+            hint="Excluye gastos anulados"
+            icon={ReceiptText}
+            label="Gastos incurridos"
+            tone="amber"
+            value={formatMoney(summary.expenseIncurred)}
+          />
+          <MetricCard
+            hint="Según fecha efectiva de pago"
+            icon={CircleCheck}
+            label="Gastos pagados"
+            tone="green"
+            value={formatMoney(summary.expensePaid)}
+          />
+          <MetricCard
+            hint="Obligaciones nuevas del período"
+            icon={FileText}
+            label="Facturas emitidas"
+            tone="blue"
+            value={formatMoney(summary.supplierBillsIssued)}
+          />
+          <MetricCard
+            hint="Pagos realizados en el mes"
+            icon={HandCoins}
+            label="Pagos a proveedores"
+            tone="violet"
+            value={formatMoney(summary.supplierPayments)}
+          />
+          <MetricCard
+            hint="Facturas abiertas"
+            icon={WalletCards}
+            label="Saldo por pagar"
+            value={formatMoney(summary.outstandingPayables)}
+          />
+          <MetricCard
+            hint="Requiere seguimiento"
+            icon={CircleAlert}
+            label="Saldo vencido"
+            tone="amber"
+            value={formatMoney(summary.overduePayables)}
+          />
         </section>
-        <section className="dashboard-card">
-          <h2>Lectura financiera</h2>
-          <p>
-            Las ventas reportadas, los gastos incurridos, los pagos y las
-            obligaciones se muestran por separado. Estas cifras no representan
-            utilidad neta.
-          </p>
-          <a className="text-link" href="/dashboard/reports">
-            Ver informe por período
-          </a>
-        </section>
+        <div className="dashboard-bottom-grid">
+          <section className="dashboard-card">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Vista financiera</p>
+                <h2>Ingresos y egresos</h2>
+              </div>
+              <ChartNoAxesCombined aria-hidden="true" className="section-heading-icon" />
+            </div>
+            <FinanceBarChart
+              items={[
+                { label: "Ventas", value: summary.salesTotal, tone: "red" },
+                {
+                  label: "Gastos incurridos",
+                  value: summary.expenseIncurred,
+                  tone: "dark",
+                },
+                {
+                  label: "Gastos pagados",
+                  value: summary.expensePaid,
+                  tone: "amber",
+                },
+              ]}
+            />
+            <p className="chart-caption">
+              Los importes se comparan como referencia; no representan utilidad neta.
+            </p>
+          </section>
+          <section className="dashboard-card dashboard-note-card">
+            <span aria-hidden="true" className="note-icon">
+              <WalletCards size={20} />
+            </span>
+            <p className="eyebrow">Próximo paso</p>
+            <h2>Mantén tus cuentas al día</h2>
+            <p>
+              Revisa las facturas abiertas y sus fechas de vencimiento para
+              anticipar pagos.
+            </p>
+            <a className="text-link" href="/dashboard/reports">
+              Ver informes <span aria-hidden="true">→</span>
+            </a>
+          </section>
+        </div>
       </div>
     </main>
   );

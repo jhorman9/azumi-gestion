@@ -23,7 +23,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   return (
     <main className="auth-page">
       <section className="auth-card" aria-labelledby="login-heading">
-        <p className="eyebrow">CRM gerencial</p>
+        <p className="eyebrow">Azumi · Administración</p>
         <h1 id="login-heading">Iniciar sesión</h1>
         <p className="description">
           Acceso privado para el equipo autorizado del restaurante.

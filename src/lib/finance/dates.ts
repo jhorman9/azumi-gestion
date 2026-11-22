@@ -37,6 +37,26 @@ export function todayInPanama(now = new Date()): string {
   return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
+export function formatDateTimeInPanama(value: string | null): string {
+  if (!value) {
+    return "—";
+  }
+
+  const timestamp = value.endsWith("Z")
+    ? value
+    : `${value.replace(" ", "T")}Z`;
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("es-PA", {
+    timeZone: "America/Panama",
+    dateStyle: "medium",
+    timeStyle: "medium",
+  }).format(date);
+}
+
 export function currentMonthInPanama(now = new Date()): DateRange {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Panama",

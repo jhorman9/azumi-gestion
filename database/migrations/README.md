@@ -15,6 +15,15 @@ Reporte Z y Pedidos Ya separados, matriz bancaria, salidas de caja y propinas
 por persona. Es aditiva: conserva los cierres y datos del formato anterior; no
 convierte los medios de pago genéricos porque no existe una equivalencia fiable.
 
+`003_closing_cash_total.sql` añade el campo de efectivo contado/registrado.
+El valor se almacena por cierre y no se deriva de las ventas, pagos bancarios o
+salidas de caja.
+
+`004_provider_expenses_and_cash_deductions.sql` elimina las categorías y sus
+plantillas recurrentes, y simplifica los gastos a proveedor, importe y método
+de pago (efectivo, tarjeta o Yappy). Permite asignar un gasto al cierre de una
+fecha y conserva los importes brutos para recalcular y auditar las deducciones.
+
 Selecciona la base correcta en phpMyAdmin, revisa el script y ejecútalo una
 sola vez. El script registra su versión en `schema_migrations` al final. La
 migración inicial se aplicó manualmente a la base configurada durante el

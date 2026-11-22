@@ -4,7 +4,14 @@ import type { PoolConnection } from "mysql2/promise";
 import { getCurrentUser } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/roles";
 import { writeAuditLog } from "@/lib/finance/audit";
-import { collectClosingFormFields } from "@/lib/finance/closing";
+import {
+  ClosingDeductionExceedsCashError,
+  refreshClosingExpenseDeduction,
+} from "@/lib/finance/closing-expenses";
+import {
+  calculateClosingTotals,
+  collectClosingFormFields,
+} from "@/lib/finance/closing";
 import { formFields } from "@/lib/finance/form";
 import {
   closingAdjustmentTypes,
@@ -18,11 +25,18 @@ interface ClosingRow extends RowDataPacket {
   id: string | number;
   operation_date: string;
   reported_sales_total: string;
+  gross_reported_sales_total: string;
   pedidos_ya_total: string;
+  cash_total: string;
+  gross_cash_total: string;
   status: "draft" | "confirmed" | "corrected";
   notes: string | null;
   confirmed_by: string | number | null;
   confirmed_at: string | null;
+}
+
+interface AssignedExpenseRow extends RowDataPacket {
+  id: string | number;
 }
 
 interface PaymentRow extends RowDataPacket {
@@ -105,6 +119,17 @@ export async function POST(
     return redirectToClosing(request, id, "error=invalid");
   }
 
+  const totals = calculateClosingTotals({
+    pedidosYaTotal: parsed.data.pedidos_ya_total,
+    cashTotal: parsed.data.cash_total,
+    channelPayments: parsed.data.channel_payments,
+    tips: parsed.data.tips,
+  });
+
+  if (!totals) {
+    return redirectToClosing(request, id, "error=invalid");
+  }
+
   let connection: PoolConnection | undefined;
   let transactionStarted = false;
 
@@ -115,7 +140,9 @@ export async function POST(
 
     const [closingRows] = await connection.execute<ClosingRow[]>(
       `SELECT id, DATE_FORMAT(operation_date, '%Y-%m-%d') AS operation_date,
-              reported_sales_total, pedidos_ya_total, status, notes, confirmed_by,
+              reported_sales_total, gross_reported_sales_total,
+              pedidos_ya_total, cash_total, gross_cash_total, status, notes,
+              confirmed_by,
               DATE_FORMAT(confirmed_at, '%Y-%m-%d %H:%i:%s') AS confirmed_at
        FROM daily_closings
        WHERE id = ?
@@ -139,6 +166,23 @@ export async function POST(
       await connection.rollback();
       transactionStarted = false;
       return redirectToClosing(request, id, "error=locked");
+    }
+
+    if (parsed.data.operation_date !== closing.operation_date) {
+      const [assignedExpenses] = await connection.execute<AssignedExpenseRow[]>(
+        `SELECT id
+         FROM expenses
+         WHERE closing_operation_date = ?
+           AND deduct_from_closing = 1
+           AND status = 'paid'
+         FOR UPDATE`,
+        [closing.operation_date],
+      );
+      if (assignedExpenses.length > 0) {
+        await connection.rollback();
+        transactionStarted = false;
+        return redirectToClosing(request, id, "error=expenses-assigned");
+      }
     }
 
     const [oldPayments] = await connection.execute<PaymentRow[]>(
@@ -177,7 +221,10 @@ export async function POST(
     const beforeData = {
       operation_date: closing.operation_date,
       reported_sales_total: closing.reported_sales_total,
+      gross_reported_sales_total: closing.gross_reported_sales_total,
       pedidos_ya_total: closing.pedidos_ya_total,
+      cash_total: closing.cash_total,
+      gross_cash_total: closing.gross_cash_total,
       status: closing.status,
       notes: closing.notes,
       confirmed_by: closing.confirmed_by,
@@ -196,16 +243,20 @@ export async function POST(
         : "draft";
     await connection.execute(
       `UPDATE daily_closings
-       SET operation_date = ?, reported_sales_total = ?, pedidos_ya_total = ?,
-           status = ?, notes = ?,
+       SET operation_date = ?, reported_sales_total = ?,
+           gross_reported_sales_total = ?, pedidos_ya_total = ?,
+           cash_total = ?, gross_cash_total = ?, status = ?, notes = ?,
            confirmed_by = IF(? = 1, NULL, ?),
            confirmed_at = IF(? = 1, NULL, UTC_TIMESTAMP(3)),
            updated_at = UTC_TIMESTAMP(3)
        WHERE id = ?`,
       [
         parsed.data.operation_date,
-        parsed.data.reported_sales_total,
+        totals.reportedSalesTotal,
+        totals.reportedSalesTotal,
         parsed.data.pedidos_ya_total,
+        parsed.data.cash_total,
+        parsed.data.cash_total,
         newStatus,
         parsed.data.notes,
         newStatus === "draft" ? 1 : 0,
@@ -213,6 +264,12 @@ export async function POST(
         newStatus === "draft" ? 1 : 0,
         id,
       ],
+    );
+    const adjustedClosing = await refreshClosingExpenseDeduction(
+      connection,
+      parsed.data.operation_date,
+      actor.id,
+      false,
     );
 
     await connection.execute(
@@ -290,8 +347,13 @@ export async function POST(
     );
     const afterData = {
       operation_date: parsed.data.operation_date,
-      reported_sales_total: parsed.data.reported_sales_total,
+      reported_sales_total:
+        adjustedClosing?.reportedSalesTotal ?? totals.reportedSalesTotal,
+      gross_reported_sales_total: totals.reportedSalesTotal,
       pedidos_ya_total: parsed.data.pedidos_ya_total,
+      cash_total: adjustedClosing?.cashTotal ?? parsed.data.cash_total,
+      gross_cash_total: parsed.data.cash_total,
+      expense_deduction_total: adjustedClosing?.deductionTotal ?? "0.00",
       status: newStatus,
       notes: parsed.data.notes,
       confirmed_by: newStatus === "draft" ? null : actor.id,
@@ -348,6 +410,10 @@ export async function POST(
 
     if (code === "ER_DUP_ENTRY") {
       return redirectToClosing(request, id, "error=duplicate");
+    }
+
+    if (error instanceof ClosingDeductionExceedsCashError) {
+      return redirectToClosing(request, id, "error=deduction-exceeds-cash");
     }
 
     console.error(`Daily closing update failed (${code}).`);

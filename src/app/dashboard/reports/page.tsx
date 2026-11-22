@@ -1,5 +1,16 @@
 import { connection } from "next/server";
 import type { RowDataPacket } from "mysql2";
+import {
+  CircleAlert,
+  CircleCheck,
+  CircleDollarSign,
+  FileText,
+  HandCoins,
+  ReceiptText,
+  WalletCards,
+} from "lucide-react";
+import { FinanceBarChart } from "@/app/components/finance-bar-chart";
+import { MetricCard } from "@/app/components/metric-card";
 import { ManagerNav } from "@/app/components/manager-nav";
 import { getDbPool } from "@/lib/db";
 import {
@@ -17,12 +28,14 @@ interface ClosingRow extends RowDataPacket {
   operation_date: string;
   reported_sales_total: string;
   pedidos_ya_total: string;
-  sales_total: string;
+  cash_total: string;
+  expense_deduction_total: string;
+  bank_total: string;
   status: "confirmed" | "corrected";
 }
 
-interface CategoryTotalRow extends RowDataPacket {
-  category_name: string;
+interface SupplierTotalRow extends RowDataPacket {
+  supplier_name: string;
   expense_count: number;
   amount: string;
 }
@@ -68,32 +81,44 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
     firstValue(params.end),
   );
   const pool = getDbPool();
-  const [summary, closings, categories] = await Promise.all([
+  const [summary, closings, suppliers] = await Promise.all([
     getFinanceSummary(pool, range),
     pool.execute<ClosingRow[]>(
       `SELECT DATE_FORMAT(operation_date, '%Y-%m-%d') AS operation_date,
-              reported_sales_total, pedidos_ya_total,
-              reported_sales_total + pedidos_ya_total AS sales_total, status
+              reported_sales_total, pedidos_ya_total, cash_total,
+              COALESCE((
+                SELECT SUM(e.amount)
+                FROM expenses e
+                WHERE e.closing_operation_date = daily_closings.operation_date
+                  AND e.deduct_from_closing = 1
+                  AND e.status = 'paid'
+              ), 0.00) AS expense_deduction_total,
+              COALESCE((
+                SELECT SUM(p.amount)
+                FROM daily_closing_channel_payments p
+                WHERE p.daily_closing_id = daily_closings.id
+              ), 0.00) AS bank_total,
+              status
        FROM daily_closings
        WHERE status IN ('confirmed', 'corrected')
          AND operation_date BETWEEN ? AND ?
        ORDER BY operation_date DESC`,
       [range.start, range.end],
     ),
-    pool.execute<CategoryTotalRow[]>(
-      `SELECT c.name AS category_name, COUNT(*) AS expense_count,
+    pool.execute<SupplierTotalRow[]>(
+      `SELECT s.legal_name AS supplier_name, COUNT(*) AS expense_count,
               COALESCE(SUM(e.amount), 0.00) AS amount
        FROM expenses e
-       INNER JOIN expense_categories c ON c.id = e.category_id
-       WHERE e.status IN ('unpaid', 'paid')
+       INNER JOIN suppliers s ON s.id = e.supplier_id
+       WHERE e.status = 'paid'
          AND e.incurred_on BETWEEN ? AND ?
-       GROUP BY c.id, c.name
-       ORDER BY amount DESC, c.name`,
+       GROUP BY s.id, s.legal_name
+       ORDER BY amount DESC, s.legal_name`,
       [range.start, range.end],
     ),
   ]);
   const closingRows = closings[0];
-  const categoryRows = categories[0];
+  const supplierRows = suppliers[0];
 
   return (
     <main className="dashboard-page">
@@ -127,41 +152,54 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
         </section>
 
         <section aria-label="Resumen del período" className="metric-grid">
-          <article className="metric-card">
-            <h2>Ventas totales</h2>
-            <p>{formatMoney(summary.salesTotal)}</p>
-            <span>Cierres confirmados o corregidos</span>
-          </article>
-          <article className="metric-card">
-            <h2>Gastos incurridos</h2>
-            <p>{formatMoney(summary.expenseIncurred)}</p>
-            <span>Por fecha del gasto; anulados excluidos</span>
-          </article>
-          <article className="metric-card">
-            <h2>Gastos pagados</h2>
-            <p>{formatMoney(summary.expensePaid)}</p>
-            <span>Por fecha efectiva de pago</span>
-          </article>
-          <article className="metric-card">
-            <h2>Facturas emitidas</h2>
-            <p>{formatMoney(summary.supplierBillsIssued)}</p>
-            <span>Obligaciones nuevas, no gastos adicionales</span>
-          </article>
-          <article className="metric-card">
-            <h2>Pagos a proveedores</h2>
-            <p>{formatMoney(summary.supplierPayments)}</p>
-            <span>Pagos aplicados en el período</span>
-          </article>
-          <article className="metric-card">
-            <h2>Saldo por pagar</h2>
-            <p>{formatMoney(summary.outstandingPayables)}</p>
-            <span>Saldo actual de facturas abiertas</span>
-          </article>
-          <article className="metric-card">
-            <h2>Saldo vencido</h2>
-            <p>{formatMoney(summary.overduePayables)}</p>
-            <span>Vencimiento anterior a hoy, hora de Panamá</span>
-          </article>
+          <MetricCard
+            hint="Cierres confirmados después de gastos descontados"
+            icon={CircleDollarSign}
+            label="Reporte Z neto del período"
+            tone="red"
+            value={formatMoney(summary.salesTotal)}
+          />
+          <MetricCard
+            hint="Por fecha del gasto; anulados excluidos"
+            icon={ReceiptText}
+            label="Gastos incurridos"
+            tone="amber"
+            value={formatMoney(summary.expenseIncurred)}
+          />
+          <MetricCard
+            hint="Por fecha efectiva de pago"
+            icon={CircleCheck}
+            label="Gastos pagados"
+            tone="green"
+            value={formatMoney(summary.expensePaid)}
+          />
+          <MetricCard
+            hint="Obligaciones nuevas, sin duplicar gastos"
+            icon={FileText}
+            label="Facturas emitidas"
+            tone="blue"
+            value={formatMoney(summary.supplierBillsIssued)}
+          />
+          <MetricCard
+            hint="Pagos aplicados en el período"
+            icon={HandCoins}
+            label="Pagos a proveedores"
+            tone="violet"
+            value={formatMoney(summary.supplierPayments)}
+          />
+          <MetricCard
+            hint="Saldo actual de facturas abiertas"
+            icon={WalletCards}
+            label="Saldo por pagar"
+            value={formatMoney(summary.outstandingPayables)}
+          />
+          <MetricCard
+            hint="Requiere seguimiento"
+            icon={CircleAlert}
+            label="Saldo vencido"
+            tone="amber"
+            value={formatMoney(summary.overduePayables)}
+          />
         </section>
 
         <section className="dashboard-card">
@@ -174,9 +212,11 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
                 <thead>
                   <tr>
                     <th scope="col">Fecha</th>
-                    <th scope="col">Reporte Z</th>
+                    <th scope="col">Reporte Z neto</th>
                     <th scope="col">Pedidos Ya</th>
-                    <th scope="col">Total ventas</th>
+                    <th scope="col">Total banco</th>
+                    <th scope="col">Efectivo neto</th>
+                    <th scope="col">Gastos descontados</th>
                     <th scope="col">Estado</th>
                   </tr>
                 </thead>
@@ -186,7 +226,9 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
                       <td>{closing.operation_date}</td>
                       <td>{formatMoney(closing.reported_sales_total)}</td>
                       <td>{formatMoney(closing.pedidos_ya_total)}</td>
-                      <td>{formatMoney(closing.sales_total)}</td>
+                      <td>{formatMoney(closing.bank_total)}</td>
+                      <td>{formatMoney(closing.cash_total)}</td>
+                      <td>{formatMoney(closing.expense_deduction_total)}</td>
                       <td>
                         {closing.status === "corrected" ? "Corregido" : "Confirmado"}
                       </td>
@@ -199,25 +241,46 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
         </section>
 
         <section className="dashboard-card">
-          <h2>Gastos incurridos por categoría</h2>
-          {categoryRows.length === 0 ? (
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Desglose</p>
+              <h2>Gastos por proveedor</h2>
+            </div>
+            <span className="table-count">
+              {supplierRows.length}{" "}
+              {supplierRows.length === 1 ? "proveedor" : "proveedores"}
+            </span>
+          </div>
+          <FinanceBarChart
+            emptyMessage="No hay gastos por proveedor en este período."
+            items={supplierRows.map((supplier, index) => ({
+              label: supplier.supplier_name,
+              value: supplier.amount,
+              tone: index === 0 ? "red" : index % 2 === 0 ? "dark" : "amber",
+            }))}
+          />
+        </section>
+
+        <section className="dashboard-card">
+          <h2>Detalle de gastos por proveedor</h2>
+          {supplierRows.length === 0 ? (
             <p className="empty-state">No hay gastos en este período.</p>
           ) : (
             <div className="table-scroll">
               <table>
                 <thead>
                   <tr>
-                    <th scope="col">Categoría</th>
+                    <th scope="col">Proveedor</th>
                     <th scope="col">Registros</th>
                     <th scope="col">Importe</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {categoryRows.map((category) => (
-                    <tr key={category.category_name}>
-                      <td>{category.category_name}</td>
-                      <td>{category.expense_count}</td>
-                      <td>{formatMoney(category.amount)}</td>
+                  {supplierRows.map((supplier) => (
+                    <tr key={supplier.supplier_name}>
+                      <td>{supplier.supplier_name}</td>
+                      <td>{supplier.expense_count}</td>
+                      <td>{formatMoney(supplier.amount)}</td>
                     </tr>
                   ))}
                 </tbody>

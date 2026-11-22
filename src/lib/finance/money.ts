@@ -7,6 +7,17 @@ export const paymentMethodLabels: Record<(typeof paymentMethods)[number], string
   other: "Otro",
 };
 
+export const expensePaymentMethods = ["cash", "card", "yappy"] as const;
+
+export const expensePaymentMethodLabels: Record<
+  (typeof expensePaymentMethods)[number],
+  string
+> = {
+  cash: "Efectivo",
+  card: "Tarjeta",
+  yappy: "Yappy",
+};
+
 export const closingAdjustmentTypes = [
   "discounts",
   "refunds",
@@ -38,6 +49,28 @@ export function moneyToCents(value: string | number): bigint {
   }
 
   return BigInt(match[1]) * BigInt(100) + BigInt((match[2] ?? "").padEnd(2, "0"));
+}
+
+function centsToMoney(cents: bigint): string {
+  return `${cents / BigInt(100)}.${String(cents % BigInt(100)).padStart(2, "0")}`;
+}
+
+export function sumMoney(values: readonly (string | number)[]): string {
+  return centsToMoney(
+    values.reduce((total, value) => total + moneyToCents(value), BigInt(0)),
+  );
+}
+
+export function subtractMoney(
+  amount: string | number,
+  deduction: string | number,
+): string | null {
+  const cents = moneyToCents(amount) - moneyToCents(deduction);
+  if (cents < BigInt(0)) {
+    return null;
+  }
+
+  return centsToMoney(cents);
 }
 
 export function formatMoney(value: string | number | null | undefined): string {

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  expensePaymentMethods,
   normalizeMoney,
   paymentMethods,
   moneyToCents,
@@ -10,6 +11,7 @@ import {
   closingPaymentTypes,
   tipSlots,
 } from "@/lib/finance/closing";
+import { todayInPanama } from "@/lib/finance/dates";
 
 function isValidBusinessDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
@@ -52,26 +54,12 @@ const positiveMoneySchema = moneySchema.refine(
   "El importe debe ser mayor que cero.",
 );
 
-const optionalIdSchema = z
-  .string()
-  .trim()
-  .transform((value) => (value === "" ? null : value))
-  .refine(
-    (value) => value === null || /^[1-9]\d{0,19}$/.test(value),
-    "Selecciona un registro válido.",
-  );
-
 const optionalText = (max: number) =>
   z
     .string()
     .trim()
     .max(max)
     .transform((value) => (value === "" ? null : value));
-
-const optionalPaymentMethodSchema = z
-  .union([z.enum(paymentMethods), z.literal("")])
-  .optional()
-  .transform((value) => (value === "" || value === undefined ? null : value));
 
 const closingOutflowSchema = z.object({
   description: optionalText(200),
@@ -87,8 +75,8 @@ export const closingFormSchema = z
   .object({
     action: z.enum(["save", "confirm", "correct"]),
     operation_date: businessDateSchema,
-    reported_sales_total: nonNegativeMoneySchema,
     pedidos_ya_total: nonNegativeMoneySchema,
+    cash_total: nonNegativeMoneySchema,
     notes: optionalText(2000),
     correction_reason: optionalText(500),
     channel_payments: z
@@ -139,10 +127,6 @@ export const closingFormSchema = z
     });
   });
 
-export const expenseCategorySchema = z.object({
-  name: z.string().trim().min(1).max(120),
-});
-
 export const supplierSchema = z.object({
   legal_name: z.string().trim().min(1).max(190),
   contact_name: optionalText(120),
@@ -164,45 +148,37 @@ export const recordStatusSchema = z.object({
 
 export const expenseSchema = z
   .object({
-    category_id: z.string().regex(/^[1-9]\d{0,19}$/),
-    supplier_id: optionalIdSchema,
-    expense_type: z.enum(["fixed", "variable"]),
+    supplier_id: z.string().regex(/^[1-9]\d{0,19}$/),
     incurred_on: businessDateSchema,
-    due_on: optionalDateSchema,
     amount: positiveMoneySchema,
-    description: z.string().trim().min(1).max(500),
-    status: z.enum(["unpaid", "paid"]),
-    payment_method: optionalPaymentMethodSchema,
+    payment_method: z.enum(expensePaymentMethods),
+    deduct_from_closing: z.enum(["0", "1"]).transform((value) => value === "1"),
+    closing_operation_date: optionalDateSchema,
   })
   .superRefine((value, context) => {
-    if (value.status === "paid" && !value.payment_method) {
+    if (value.deduct_from_closing && !value.closing_operation_date) {
       context.addIssue({
         code: "custom",
-        message: "Selecciona el método de pago.",
-        path: ["payment_method"],
+        message: "Selecciona la fecha del cierre que recibirá el descuento.",
+        path: ["closing_operation_date"],
       });
     }
 
-    if (value.status === "unpaid" && value.payment_method) {
+    if (
+      value.deduct_from_closing &&
+      value.closing_operation_date &&
+      value.closing_operation_date > todayInPanama()
+    ) {
       context.addIssue({
         code: "custom",
-        message: "Un gasto pendiente no puede tener método de pago.",
-        path: ["payment_method"],
-      });
-    }
-
-    if (value.due_on && value.due_on < value.incurred_on) {
-      context.addIssue({
-        code: "custom",
-        message: "El vencimiento no puede ser anterior a la fecha del gasto.",
-        path: ["due_on"],
+        message: "El gasto solo puede descontarse de hoy o de días anteriores.",
+        path: ["closing_operation_date"],
       });
     }
   });
 
 export const expenseStatusSchema = z.object({
-  action: z.enum(["pay", "void"]),
-  payment_method: optionalPaymentMethodSchema,
+  action: z.literal("void"),
 });
 
 export const billSchema = z
