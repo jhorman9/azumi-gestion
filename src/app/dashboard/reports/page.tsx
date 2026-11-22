@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { connection } from "next/server";
 import type { RowDataPacket } from "mysql2";
 import {
@@ -41,12 +42,20 @@ interface SupplierTotalRow extends RowDataPacket {
   amount: string;
 }
 
+interface CountRow extends RowDataPacket {
+  total: number | string;
+}
+
 interface ReportsPageProps {
   searchParams: Promise<{
+    closingPage?: string | string[];
     start?: string | string[];
     end?: string | string[];
+    supplierPage?: string | string[];
   }>;
 }
+
+const pageSize = 10;
 
 function firstValue(value?: string | string[]): string | undefined {
   return Array.isArray(value) ? value[0] : value;
@@ -82,8 +91,44 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
     firstValue(params.end),
   );
   const pool = getDbPool();
-  const [summary, closings, suppliers] = await Promise.all([
+  const [summary, closingCountRows, supplierCountRows] = await Promise.all([
     getFinanceSummary(pool, range),
+    pool.execute<CountRow[]>(
+      `SELECT COUNT(*) AS total
+       FROM daily_closings
+       WHERE status IN ('confirmed', 'corrected')
+         AND operation_date BETWEEN ? AND ?`,
+      [range.start, range.end],
+    ),
+    pool.execute<CountRow[]>(
+      `SELECT COUNT(DISTINCT supplier_id) AS total
+       FROM expenses
+       WHERE status = 'paid'
+         AND incurred_on BETWEEN ? AND ?`,
+      [range.start, range.end],
+    ),
+  ]);
+  const closingTotal = Number(closingCountRows[0][0]?.total ?? 0);
+  const supplierTotal = Number(supplierCountRows[0][0]?.total ?? 0);
+  const closingPageCount = Math.max(1, Math.ceil(closingTotal / pageSize));
+  const supplierPageCount = Math.max(1, Math.ceil(supplierTotal / pageSize));
+  const requestedClosingPage = Number(
+    firstValue(params.closingPage) ?? "1",
+  );
+  const requestedSupplierPage = Number(
+    firstValue(params.supplierPage) ?? "1",
+  );
+  const closingPage =
+    Number.isSafeInteger(requestedClosingPage) && requestedClosingPage > 0
+      ? Math.min(requestedClosingPage, closingPageCount)
+      : 1;
+  const supplierPage =
+    Number.isSafeInteger(requestedSupplierPage) && requestedSupplierPage > 0
+      ? Math.min(requestedSupplierPage, supplierPageCount)
+      : 1;
+  const closingOffset = (closingPage - 1) * pageSize;
+  const supplierOffset = (supplierPage - 1) * pageSize;
+  const [closings, suppliers, topSuppliers] = await Promise.all([
     pool.execute<ClosingRow[]>(
       `SELECT DATE_FORMAT(operation_date, '%Y-%m-%d') AS operation_date,
               reported_sales_total, pedidos_ya_total, cash_total,
@@ -108,8 +153,9 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
        FROM daily_closings
        WHERE status IN ('confirmed', 'corrected')
          AND operation_date BETWEEN ? AND ?
-       ORDER BY operation_date DESC`,
-      [range.start, range.end],
+       ORDER BY operation_date DESC
+       LIMIT ? OFFSET ?`,
+      [range.start, range.end, pageSize, closingOffset],
     ),
     pool.execute<SupplierTotalRow[]>(
       `SELECT s.legal_name AS supplier_name, COUNT(*) AS expense_count,
@@ -119,12 +165,38 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
        WHERE e.status = 'paid'
          AND e.incurred_on BETWEEN ? AND ?
        GROUP BY s.id, s.legal_name
-       ORDER BY amount DESC, s.legal_name`,
+       ORDER BY amount DESC, s.legal_name
+       LIMIT ? OFFSET ?`,
+      [range.start, range.end, pageSize, supplierOffset],
+    ),
+    pool.execute<SupplierTotalRow[]>(
+      `SELECT s.legal_name AS supplier_name, COUNT(*) AS expense_count,
+              COALESCE(SUM(e.amount), 0.00) AS amount
+       FROM expenses e
+       INNER JOIN suppliers s ON s.id = e.supplier_id
+       WHERE e.status = 'paid'
+         AND e.incurred_on BETWEEN ? AND ?
+       GROUP BY s.id, s.legal_name
+       ORDER BY amount DESC, s.legal_name
+       LIMIT 5`,
       [range.start, range.end],
     ),
   ]);
   const closingRows = closings[0];
   const supplierRows = suppliers[0];
+  const topSupplierRows = topSuppliers[0];
+  const pageHref = (
+    closingPageValue: number,
+    supplierPageValue: number,
+  ) => {
+    const query = new URLSearchParams({
+      start: range.start,
+      end: range.end,
+      closingPage: String(closingPageValue),
+      supplierPage: String(supplierPageValue),
+    });
+    return `/dashboard/reports?${query.toString()}`;
+  };
 
   return (
     <main className="dashboard-page">
@@ -209,8 +281,16 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
         </section>
 
         <section className="dashboard-card">
-          <h2>Cierres incluidos</h2>
-          {closingRows.length === 0 ? (
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Detalle diario</p>
+              <h2>Cierres incluidos</h2>
+            </div>
+            <span className="table-count">
+              {closingTotal} {closingTotal === 1 ? "cierre" : "cierres"}
+            </span>
+          </div>
+          {closingTotal === 0 ? (
             <p className="empty-state">No hay cierres confirmados en este período.</p>
           ) : (
             <div className="table-scroll">
@@ -246,6 +326,50 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
               </table>
             </div>
           )}
+          {closingTotal > 0 ? (
+            <nav aria-label="Paginación de cierres del informe" className="reports-pagination">
+              <span>
+                {closingOffset + 1}–
+                {Math.min(closingOffset + pageSize, closingTotal)} de{" "}
+                {closingTotal} cierres
+              </span>
+              <div>
+                {closingPage > 1 ? (
+                  <Link
+                    className="button-secondary text-link"
+                    href={pageHref(closingPage - 1, supplierPage)}
+                  >
+                    Anterior
+                  </Link>
+                ) : (
+                  <span
+                    aria-disabled="true"
+                    className="reports-pagination-disabled"
+                  >
+                    Anterior
+                  </span>
+                )}
+                <span>
+                  Página {closingPage} de {closingPageCount}
+                </span>
+                {closingPage < closingPageCount ? (
+                  <Link
+                    className="button-secondary text-link"
+                    href={pageHref(closingPage + 1, supplierPage)}
+                  >
+                    Siguiente
+                  </Link>
+                ) : (
+                  <span
+                    aria-disabled="true"
+                    className="reports-pagination-disabled"
+                  >
+                    Siguiente
+                  </span>
+                )}
+              </div>
+            </nav>
+          ) : null}
         </section>
 
         <section className="dashboard-card">
@@ -255,23 +379,29 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
               <h2>Gastos por proveedor</h2>
             </div>
             <span className="table-count">
-              {supplierRows.length}{" "}
-              {supplierRows.length === 1 ? "proveedor" : "proveedores"}
+              {supplierTotal}{" "}
+              {supplierTotal === 1 ? "proveedor" : "proveedores"}
             </span>
           </div>
           <FinanceBarChart
             emptyMessage="No hay gastos por proveedor en este período."
-            items={supplierRows.map((supplier, index) => ({
+            items={topSupplierRows.map((supplier, index) => ({
               label: supplier.supplier_name,
               value: supplier.amount,
               tone: index === 0 ? "red" : index % 2 === 0 ? "dark" : "amber",
             }))}
           />
+          {supplierTotal > 5 ? (
+            <p className="form-hint">
+              Gráfico de los 5 proveedores con mayor gasto. La tabla incluye
+              todos los proveedores y se pagina de 10 en 10.
+            </p>
+          ) : null}
         </section>
 
         <section className="dashboard-card">
           <h2>Detalle de gastos por proveedor</h2>
-          {supplierRows.length === 0 ? (
+          {supplierTotal === 0 ? (
             <p className="empty-state">No hay gastos en este período.</p>
           ) : (
             <div className="table-scroll">
@@ -295,6 +425,50 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
               </table>
             </div>
           )}
+          {supplierTotal > 0 ? (
+            <nav aria-label="Paginación de gastos por proveedor" className="reports-pagination">
+              <span>
+                {supplierOffset + 1}–
+                {Math.min(supplierOffset + pageSize, supplierTotal)} de{" "}
+                {supplierTotal} proveedores
+              </span>
+              <div>
+                {supplierPage > 1 ? (
+                  <Link
+                    className="button-secondary text-link"
+                    href={pageHref(closingPage, supplierPage - 1)}
+                  >
+                    Anterior
+                  </Link>
+                ) : (
+                  <span
+                    aria-disabled="true"
+                    className="reports-pagination-disabled"
+                  >
+                    Anterior
+                  </span>
+                )}
+                <span>
+                  Página {supplierPage} de {supplierPageCount}
+                </span>
+                {supplierPage < supplierPageCount ? (
+                  <Link
+                    className="button-secondary text-link"
+                    href={pageHref(closingPage, supplierPage + 1)}
+                  >
+                    Siguiente
+                  </Link>
+                ) : (
+                  <span
+                    aria-disabled="true"
+                    className="reports-pagination-disabled"
+                  >
+                    Siguiente
+                  </span>
+                )}
+              </div>
+            </nav>
+          ) : null}
         </section>
 
         <section className="dashboard-card">
