@@ -12,7 +12,6 @@ export const permissions = [
   "closings:write",
   "finance:read",
   "finance:write",
-  "menu:manage",
 ] as const;
 
 export type Permission = (typeof permissions)[number];
@@ -25,9 +24,8 @@ const rolePermissions = {
     "closings:write",
     "finance:read",
     "finance:write",
-    "menu:manage",
   ]),
-  menu_editor: new Set<Permission>(["menu:manage"]),
+  menu_editor: new Set<Permission>(),
 } as const;
 
 export function hasPermission(
@@ -38,7 +36,7 @@ export function hasPermission(
 }
 
 export function homePathForRole(role: UserRole): string {
-  return role === "menu_editor" ? "/dashboard/menu" : "/dashboard";
+  return role === "menu_editor" ? "/login?error=role-retired" : "/dashboard";
 }
 
 export async function requirePermission(

@@ -5,6 +5,7 @@ import type { RowDataPacket } from "mysql2";
 import { cookies } from "next/headers";
 import { getDbPool } from "@/lib/db";
 
+// Keep the legacy database value so retired accounts can be denied safely.
 export type UserRole = "admin" | "manager" | "menu_editor";
 
 export interface SessionUser {
@@ -93,6 +94,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
      WHERE s.token_hash = ?
        AND s.expires_at > UTC_TIMESTAMP(3)
        AND u.is_active = 1
+       AND u.user_role <> 'menu_editor'
      LIMIT 1`,
     [digest(token)],
   );

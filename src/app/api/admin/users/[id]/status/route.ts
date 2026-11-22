@@ -94,6 +94,12 @@ export async function POST(
       return redirectToUsers(request, "error=not-found");
     }
 
+    if (target.user_role === "menu_editor" && isActive) {
+      await connection.rollback();
+      transactionStarted = false;
+      return redirectToUsers(request, "error=role-retired");
+    }
+
     const wasActive = Boolean(target.is_active);
 
     if (wasActive === isActive) {

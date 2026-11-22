@@ -17,7 +17,6 @@ export function ManagerNav({
   const canReadDashboard = hasPermission(user.role, "dashboard:read");
   const canReadClosings = hasPermission(user.role, "closings:read");
   const canReadFinance = hasPermission(user.role, "finance:read");
-  const canManageMenu = hasPermission(user.role, "menu:manage");
   const canManageUsers = hasPermission(user.role, "users:manage");
 
   return (
@@ -80,19 +79,12 @@ export function ManagerNav({
             </div>
           ) : null}
 
-          {canManageMenu || canManageUsers ? (
+          {canManageUsers ? (
             <div className="sidebar-nav-group">
               <p className="sidebar-section-label">ADMINISTRACIÓN</p>
-              {canManageMenu ? (
-                <SidebarLink href="/dashboard/menu" icon="menu">
-                  Menú digital
-                </SidebarLink>
-              ) : null}
-              {canManageUsers ? (
-                <SidebarLink href="/admin/users" icon="users">
-                  Usuarios
-                </SidebarLink>
-              ) : null}
+              <SidebarLink href="/admin/users" icon="users">
+                Usuarios
+              </SidebarLink>
             </div>
           ) : null}
 

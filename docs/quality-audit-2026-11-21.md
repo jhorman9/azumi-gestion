@@ -75,9 +75,8 @@ auditoría.
   rutas se incluyen en la compilación. Los datos actuales permiten revisar
   gastos/proveedores/auditoría, pero no hay facturas para probar pagos parciales
   con datos reales.
-- **Menú digital:** la página enlazada desde la navegación es un marcador
-  “Próximamente”; la Fase 2 (categorías/productos/promociones) aún no tiene
-  operaciones API. No debe presentarse como funcional.
+- **Menú digital:** en la fecha de esta revisión, la página aún era un marcador
+  “Próximamente”, sin operaciones API.
 - **Vista previa de cierres:** `/closing-preview` es solo para desarrollo, no
   guarda datos y devuelve 404 en producción.
 - **Componentes compartidos:** las búsquedas de referencias encontraron uso de
@@ -98,10 +97,7 @@ auditoría.
    transacciones con rollback, no los datos reales.
 2. Verificar el login y el build bajo Node.js 22.x, que es el runtime previsto
    para Hostinger.
-3. Decidir si se oculta temporalmente “Menú digital” hasta implementar la Fase
-   2. No se desactivó en esta revisión porque el rol `menu_editor` utiliza esa
-   ruta como destino de inicio.
-4. Elegir un solo gestor de paquetes y agregar pruebas automatizadas para los
+3. Elegir un solo gestor de paquetes y agregar pruebas automatizadas para los
    cálculos monetarios y el recálculo transaccional de gastos/cierres.
 
 ## Estado del repositorio
@@ -109,3 +105,13 @@ auditoría.
 Al comenzar esta revisión ya había numerosos archivos modificados y nuevos de
 trabajo previo. Se conservaron intactos; revisar `git status` antes de preparar
 un commit para no mezclar o descartar esos cambios.
+
+## Seguimiento — retiro del menú digital
+
+Después de esta revisión se eliminó la página y el enlace de navegación del
+menú digital, se retiró el permiso y se deshabilitó la creación/reactivación del
+rol `menu_editor`. La migración `005_retire_menu_editor_accounts.sql` se aplicó
+a la base de desarrollo y encontró cero cuentas que desactivar. La ruta del
+menú ahora devuelve HTTP 404; build, lint y TypeScript pasan después del retiro.
+Las tablas históricas del menú y promociones se conservan; no se borraron datos
+ni tablas.

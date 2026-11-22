@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const userRoles = ["admin", "manager", "menu_editor"] as const;
+export const userRoles = ["admin", "manager"] as const;
 
 const emailSchema = z
   .string()

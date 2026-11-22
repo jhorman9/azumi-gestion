@@ -1,8 +1,8 @@
 # CRM gerencial para restaurante
 
 Aplicación privada para registrar cierres diarios del POS, gastos, proveedores,
-cuentas por pagar y administrar el menú digital. No reemplaza el POS ni crea
-una web pública de pedidos.
+cuentas por pagar y reportes. No reemplaza el POS ni crea una web pública de
+pedidos.
 
 El MVP gerencial incluye autenticación privada, cierres diarios auditables,
 registro de gastos, directorio de proveedores, facturas con pagos parciales y

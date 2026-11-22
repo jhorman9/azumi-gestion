@@ -102,7 +102,12 @@ export async function verifyCredentials(
       user?.password_hash ?? dummyPasswordHash,
     );
 
-    if (!user || !user.is_active || !passwordMatches) {
+    if (
+      !user ||
+      !user.is_active ||
+      user.user_role === "menu_editor" ||
+      !passwordMatches
+    ) {
       await connection.execute(
         `UPDATE login_attempt_limits
          SET locked_until = CASE

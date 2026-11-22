@@ -27,14 +27,13 @@ inventario por ingredientes ni sincronización automática con el POS.
 
 | Rol | Acceso |
 |---|---|
-| Administrador | Todos los módulos, cierres, finanzas, menú, promociones y usuarios. |
-| Gerente | Operación y finanzas autorizadas; puede administrar menú. |
-| Editor de menú | Categorías, productos y promociones; sin datos financieros. |
+| Administrador | Todos los módulos gerenciales, cierres, finanzas y usuarios. |
+| Gerente | Operación y finanzas autorizadas. |
 
-Navegación privada prevista: Inicio, Cierres diarios, Gastos, Proveedores y
-cuentas por pagar, Finanzas, Menú digital y Promociones. Usuarios y permisos
-quedan en Administración. Personal se reserva para una fase posterior. Cada
-ruta y mutación deberá validar la sesión y el permiso en el servidor.
+Navegación privada: Inicio, Cierres diarios, Gastos, Proveedores, cuentas por
+pagar, Informes y Auditoría. Usuarios quedan en Administración. Personal se
+reserva para una fase posterior. Cada ruta y mutación valida la sesión y el
+permiso en el servidor.
 
 ## Decisiones contables iniciales
 
@@ -68,12 +67,7 @@ ruta y mutación deberá validar la sesión y el permiso en el servidor.
   calculan con `float` de JavaScript.
 - Zona horaria de negocio: `America/Panama`; fechas de operación no se
   convierten como timestamps. La aplicación escribe timestamps técnicos en
-  UTC; horarios de promociones se capturan en hora de Panamá y se convierten a
-  UTC al persistirlos.
-- Las promociones no cambian el precio base, no se acumulan y no modifican el
-  POS; el precio efectivo se calcula y se prueba en el servidor. Una promoción
-  debe apuntar a productos o a categorías, no a ambos; la validación se hará en
-  el servicio de dominio.
+  UTC.
 
 ## Plan por fases y dependencias
 
@@ -86,11 +80,7 @@ ruta y mutación deberá validar la sesión y el permiso en el servidor.
    de usuarios → cierres diarios y auditoría → gastos, proveedores y facturas
    con pagos → dashboard y reportes. Los reportes dependen de las reglas de
    contabilización y tablas aprobadas primero.
-3. **Fase 2 — Menú y promociones:** CRUD de categorías/productos → promociones
-   y prioridad no acumulable → vista previa, auditoría y contrato JSON para
-   futura integración con la web externa. No se implementa esa integración
-   hasta conocer su consumidor.
-4. **Fase 3 — Mejoras administrativas:** personal básico, exportaciones,
+3. **Fase 2 — Mejoras administrativas:** personal básico, exportaciones,
    importador CSV solo tras recibir un ejemplo real del POS, pruebas de
    respaldo/restauración y validación de despliegue.
 
@@ -103,9 +93,8 @@ plan admita Next.js SSR, las versiones de MySQL/MariaDB, límites de
 memoria/procesos/conexiones y método de despliegue. No se presume acceso SSH,
 cron ni conexiones externas a MySQL.
 
-La integración futura del menú requiere conocer cómo consume datos la web
-existente. La importación CSV requiere un archivo real de ejemplo. Ninguna de
-las dos se inventará.
+La importación CSV requiere un archivo real de ejemplo. No se desarrolla ni
+sincroniza un módulo de menú digital.
 
 ## Seguridad y operación
 

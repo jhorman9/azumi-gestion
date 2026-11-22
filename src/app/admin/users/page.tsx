@@ -28,6 +28,13 @@ const errorMessages: Record<string, string> = {
   self: "No puedes desactivar tu propia cuenta.",
   "not-found": "No se encontró el usuario.",
   "last-admin": "No puedes desactivar la última cuenta administradora activa.",
+  "role-retired": "El rol de editor de menú fue retirado y no se puede activar.",
+};
+
+const roleLabels: Record<string, string> = {
+  admin: "Administrador",
+  manager: "Gerente",
+  menu_editor: "Editor de menú (retirado)",
 };
 
 export default async function AdminUsersPage({
@@ -114,7 +121,6 @@ export default async function AdminUsersPage({
                 <select defaultValue="manager" name="role">
                   <option value="admin">Administrador</option>
                   <option value="manager">Gerente</option>
-                  <option value="menu_editor">Editor de menú</option>
                 </select>
               </label>
             </div>
@@ -150,10 +156,12 @@ export default async function AdminUsersPage({
                     <tr key={String(row.id)}>
                       <td>{row.name}</td>
                       <td>{row.email}</td>
-                      <td>{row.user_role}</td>
+                      <td>{roleLabels[row.user_role] ?? row.user_role}</td>
                       <td>{isActive ? "Activo" : "Inactivo"}</td>
                       <td>
-                        {isCurrentUser ? (
+                        {row.user_role === "menu_editor" ? (
+                          "Rol retirado"
+                        ) : isCurrentUser ? (
                           "Tu cuenta"
                         ) : (
                           <form
