@@ -7,7 +7,10 @@ import { writeAuditLog } from "@/lib/finance/audit";
 import { formFields } from "@/lib/finance/form";
 import { moneyToCents } from "@/lib/finance/money";
 import { getDbPool } from "@/lib/db";
-import { hasSameOrigin } from "@/lib/security/origin";
+import {
+  getSameOriginUrl,
+  hasSameOrigin,
+} from "@/lib/security/origin";
 import { billPaymentSchema } from "@/lib/validation/finance";
 
 interface BillRow extends RowDataPacket {
@@ -21,7 +24,7 @@ interface PaidRow extends RowDataPacket {
 
 function redirectToBills(request: Request, result: string) {
   return NextResponse.redirect(
-    new URL(`/dashboard/bills?${result}`, request.url),
+    getSameOriginUrl(request, `/dashboard/bills?${result}`),
     303,
   );
 }

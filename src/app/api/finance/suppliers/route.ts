@@ -6,12 +6,15 @@ import { hasPermission } from "@/lib/auth/roles";
 import { writeAuditLog } from "@/lib/finance/audit";
 import { formFields } from "@/lib/finance/form";
 import { getDbPool } from "@/lib/db";
-import { hasSameOrigin } from "@/lib/security/origin";
+import {
+  getSameOriginUrl,
+  hasSameOrigin,
+} from "@/lib/security/origin";
 import { supplierSchema } from "@/lib/validation/finance";
 
 function redirectToSuppliers(request: Request, result: string) {
   return NextResponse.redirect(
-    new URL(`/dashboard/suppliers?${result}`, request.url),
+    getSameOriginUrl(request, `/dashboard/suppliers?${result}`),
     303,
   );
 }

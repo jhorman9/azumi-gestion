@@ -4,7 +4,10 @@ import type { PoolConnection } from "mysql2/promise";
 import { getCurrentUser } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/roles";
 import { getDbPool } from "@/lib/db";
-import { hasSameOrigin } from "@/lib/security/origin";
+import {
+  getSameOriginUrl,
+  hasSameOrigin,
+} from "@/lib/security/origin";
 
 interface TargetUserRow extends RowDataPacket {
   id: string | number;
@@ -14,7 +17,7 @@ interface TargetUserRow extends RowDataPacket {
 
 function redirectToUsers(request: Request, result: string) {
   return NextResponse.redirect(
-    new URL(`/admin/users?${result}`, request.url),
+    getSameOriginUrl(request, `/admin/users?${result}`),
     303,
   );
 }

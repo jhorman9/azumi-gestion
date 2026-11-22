@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { revokeCurrentSession } from "@/lib/auth/session";
-import { hasSameOrigin } from "@/lib/security/origin";
+import {
+  getSameOriginUrl,
+  hasSameOrigin,
+} from "@/lib/security/origin";
 
 export async function POST(request: Request) {
   if (!hasSameOrigin(request)) {
@@ -8,5 +11,5 @@ export async function POST(request: Request) {
   }
 
   await revokeCurrentSession();
-  return NextResponse.redirect(new URL("/login", request.url), 303);
+  return NextResponse.redirect(getSameOriginUrl(request, "/login"), 303);
 }

@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { createSession } from "@/lib/auth/session";
 import { verifyCredentials } from "@/lib/auth/credentials";
 import { homePathForRole } from "@/lib/auth/roles";
-import { hasSameOrigin } from "@/lib/security/origin";
+import {
+  getSameOriginUrl,
+  hasSameOrigin,
+} from "@/lib/security/origin";
 import { loginSchema } from "@/lib/validation/auth";
 
 function errorCode(error: unknown): string {
@@ -33,7 +36,10 @@ export async function POST(request: Request) {
   });
 
   if (!parsed.success) {
-    return NextResponse.redirect(new URL("/login?error=invalid", request.url), 303);
+    return NextResponse.redirect(
+      getSameOriginUrl(request, "/login?error=invalid"),
+      303,
+    );
   }
 
   try {
@@ -44,14 +50,14 @@ export async function POST(request: Request) {
 
     if (result.status !== "authenticated") {
       return NextResponse.redirect(
-        new URL("/login?error=invalid", request.url),
+        getSameOriginUrl(request, "/login?error=invalid"),
         303,
       );
     }
 
     await createSession(result.user.id);
     return NextResponse.redirect(
-      new URL(homePathForRole(result.user.role), request.url),
+      getSameOriginUrl(request, homePathForRole(result.user.role)),
       303,
     );
   } catch (error) {

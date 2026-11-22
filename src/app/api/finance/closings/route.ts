@@ -14,12 +14,15 @@ import {
 } from "@/lib/finance/closing";
 import { formFields } from "@/lib/finance/form";
 import { getDbPool } from "@/lib/db";
-import { hasSameOrigin } from "@/lib/security/origin";
+import {
+  getSameOriginUrl,
+  hasSameOrigin,
+} from "@/lib/security/origin";
 import { closingFormSchema } from "@/lib/validation/finance";
 
 function redirectToClosings(request: Request, result: string) {
   return NextResponse.redirect(
-    new URL(`/dashboard/closings?${result}`, request.url),
+    getSameOriginUrl(request, `/dashboard/closings?${result}`),
     303,
   );
 }

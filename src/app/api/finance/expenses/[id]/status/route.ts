@@ -7,7 +7,10 @@ import { writeAuditLog } from "@/lib/finance/audit";
 import { refreshClosingExpenseDeduction } from "@/lib/finance/closing-expenses";
 import { formFields } from "@/lib/finance/form";
 import { getDbPool } from "@/lib/db";
-import { hasSameOrigin } from "@/lib/security/origin";
+import {
+  getSameOriginUrl,
+  hasSameOrigin,
+} from "@/lib/security/origin";
 import { expenseStatusSchema } from "@/lib/validation/finance";
 
 interface ExpenseRow extends RowDataPacket {
@@ -23,7 +26,7 @@ interface ExpenseRow extends RowDataPacket {
 
 function redirectToExpenses(request: Request, result: string) {
   return NextResponse.redirect(
-    new URL(`/dashboard/expenses?${result}`, request.url),
+    getSameOriginUrl(request, `/dashboard/expenses?${result}`),
     303,
   );
 }

@@ -18,7 +18,10 @@ import {
   paymentMethods,
 } from "@/lib/finance/money";
 import { getDbPool } from "@/lib/db";
-import { hasSameOrigin } from "@/lib/security/origin";
+import {
+  getSameOriginUrl,
+  hasSameOrigin,
+} from "@/lib/security/origin";
 import { closingFormSchema } from "@/lib/validation/finance";
 
 interface ClosingRow extends RowDataPacket {
@@ -65,7 +68,10 @@ interface CashOutflowRow extends RowDataPacket {
 
 function redirectToClosing(request: Request, id: string, result: string) {
   return NextResponse.redirect(
-    new URL(`/dashboard/closings/${encodeURIComponent(id)}?${result}`, request.url),
+    getSameOriginUrl(
+      request,
+      `/dashboard/closings/${encodeURIComponent(id)}?${result}`,
+    ),
     303,
   );
 }
