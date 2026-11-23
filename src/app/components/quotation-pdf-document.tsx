@@ -1,5 +1,6 @@
 import {
   Document,
+  Image,
   Page,
   StyleSheet,
   Text,
@@ -8,6 +9,7 @@ import {
 import { formatMoney } from "@/lib/finance/money";
 
 interface QuotationPdfDocumentProps {
+  logoSrc: string;
   quoteNumber: string;
   quoteDate: string;
   validUntil: string;
@@ -50,12 +52,10 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     paddingRight: 16,
   },
-  brand: {
+  brandLogo: {
+    width: 90,
+    height: 75,
     marginBottom: 5,
-    color: "#b4232c",
-    fontSize: 13,
-    fontWeight: "bold",
-    letterSpacing: 2,
   },
   companyName: {
     marginBottom: 5,
@@ -217,6 +217,7 @@ function formatPdfDate(value: string): string {
 }
 
 export function QuotationPdfDocument({
+  logoSrc,
   quoteNumber,
   quoteDate,
   validUntil,
@@ -236,7 +237,8 @@ export function QuotationPdfDocument({
       <Page size="LETTER" style={styles.page} wrap>
         <View style={styles.header} wrap={false}>
           <View style={styles.company}>
-            <Text style={styles.brand}>AZUMI</Text>
+            {/* eslint-disable-next-line jsx-a11y/alt-text */}
+            <Image src={logoSrc} style={styles.brandLogo} />
             <Text style={styles.companyName}>RESTAURANTE AZUMI BISTRO INC</Text>
             <Text style={styles.companyDetail}>RUC: 155744922-2-2023 DV99</Text>
             <Text style={styles.companyDetail}>

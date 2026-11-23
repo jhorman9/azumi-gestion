@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import {
   useCallback,
   useEffect,
@@ -187,6 +188,7 @@ export function QuotationBuilder() {
           client={client}
           lineTotals={totals.lineTotals}
           lines={lines}
+          logoSrc={new URL("/logo.png", window.location.origin).href}
           quoteDate={quoteDate}
           quoteNumber={quoteNumber}
           subtotal={totals.subtotal}
@@ -417,7 +419,13 @@ export function QuotationBuilder() {
       <section aria-label="Vista previa de la cotización" className="quotation-paper">
         <header className="quotation-document-header">
           <div className="quotation-company">
-            <p className="quotation-brand">AZUMI</p>
+            <Image
+              alt="Logo de Restaurante Azumi Bistro Inc"
+              className="quotation-brand-logo"
+              height={100}
+              src="/logo.png"
+              width={120}
+            />
             <h2>RESTAURANTE AZUMI BISTRO INC</h2>
             <p>RUC: 155744922-2-2023 DV99</p>
             <p>San Francisco, calle 72, frente al Instituto Italiano Enrico Fermi, locales 2 y 3.</p>

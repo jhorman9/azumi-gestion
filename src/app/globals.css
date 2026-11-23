@@ -2527,12 +2527,13 @@ td a:hover,
   gap: 5px;
 }
 
-.quotation-brand {
-  margin: 0 0 4px;
-  color: #b4232c;
-  font-size: 1.15rem;
-  font-weight: 850;
-  letter-spacing: 0.19em;
+.quotation-brand-logo {
+  display: block;
+  width: 120px;
+  height: 100px;
+  margin-bottom: 4px;
+  object-fit: contain;
+  object-position: left center;
 }
 
 .quotation-company h2 {
@@ -2542,7 +2543,7 @@ td a:hover,
   letter-spacing: -0.02em;
 }
 
-.quotation-company > p:not(.quotation-brand) {
+.quotation-company > p {
   margin: 0;
   color: #625a55;
   font-size: 0.74rem;
