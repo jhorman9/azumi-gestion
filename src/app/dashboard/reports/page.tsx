@@ -11,7 +11,7 @@ import {
   WalletCards,
 } from "lucide-react";
 import { FinanceComparisonChart } from "@/app/components/finance-comparison-chart";
-import { ExpenseTreatmentBreakdown } from "@/app/components/expense-treatment-breakdown";
+import { ExpensePeriodSummary } from "@/app/components/expense-period-summary";
 import { MetricCard } from "@/app/components/metric-card";
 import { ManagerNav } from "@/app/components/manager-nav";
 import { getDbPool } from "@/lib/db";
@@ -32,7 +32,6 @@ interface ClosingRow extends RowDataPacket {
   pedidos_ya_total: string;
   cash_total: string;
   cash_outflow_total: string;
-  expense_deduction_total: string;
   bank_total: string;
   status: "confirmed" | "corrected";
 }
@@ -139,13 +138,6 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
                 WHERE o.daily_closing_id = daily_closings.id
               ), 0.00) AS cash_outflow_total,
               COALESCE((
-                SELECT SUM(e.amount)
-                FROM expenses e
-                WHERE e.closing_operation_date = daily_closings.operation_date
-                  AND e.deduct_from_closing = 1
-                  AND e.status = 'paid'
-              ), 0.00) AS expense_deduction_total,
-              COALESCE((
                 SELECT SUM(p.amount)
                 FROM daily_closing_channel_payments p
                 WHERE p.daily_closing_id = daily_closings.id
@@ -232,21 +224,21 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
 
         <section aria-label="Resumen del período" className="metric-grid">
           <MetricCard
-            hint="Reporte Z neto menos gastos sin descuento de cierre; puede ser negativo"
+            hint="Reporte Z neto del cierre menos todos los gastos; puede ser negativo"
             icon={CircleDollarSign}
-            label="Reporte Z − gastos sin descuento"
+            label="Reporte Z − gastos del período"
             tone="red"
-            value={formatMoney(summary.salesAfterUnassignedExpenses)}
+            value={formatMoney(summary.salesAfterExpenses)}
           />
           <MetricCard
-            hint="Gastos pagados por fecha del gasto; incluye ambas categorías"
+            hint="Todos los gastos pagados, por fecha del gasto"
             icon={ReceiptText}
             label="Gastos incurridos"
             tone="amber"
             value={formatMoney(summary.expenseIncurred)}
           />
           <MetricCard
-            hint="Por fecha de pago; incluye ambas categorías"
+            hint="Total de gastos registrados por fecha efectiva de pago"
             icon={CircleCheck}
             label="Gastos pagados"
             tone="green"
@@ -280,13 +272,10 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
             value={formatMoney(summary.overduePayables)}
           />
         </section>
-        <ExpenseTreatmentBreakdown
-          closingExpenseDeductions={summary.closingExpenseDeductions}
+        <ExpensePeriodSummary
           expenseIncurred={summary.expenseIncurred}
-          expenseIncurredDeducted={summary.expenseIncurredDeducted}
-          expenseIncurredNotDeducted={summary.expenseIncurredNotDeducted}
           salesTotal={summary.salesTotal}
-          salesAfterUnassignedExpenses={summary.salesAfterUnassignedExpenses}
+          salesAfterExpenses={summary.salesAfterExpenses}
         />
 
         <section className="dashboard-card">
@@ -312,11 +301,6 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
                     <th scope="col">Total banco</th>
                     <th scope="col">Efectivo neto</th>
                     <th scope="col">Salidas de caja</th>
-                    <th scope="col">
-                      <span title="Ya incluidos en el Reporte Z neto.">
-                        Gastos descontados
-                      </span>
-                    </th>
                     <th scope="col">Estado</th>
                   </tr>
                 </thead>
@@ -329,7 +313,6 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
                       <td>{formatMoney(closing.bank_total)}</td>
                       <td>{formatMoney(closing.cash_total)}</td>
                       <td>{formatMoney(closing.cash_outflow_total)}</td>
-                      <td>{formatMoney(closing.expense_deduction_total)}</td>
                       <td>
                         {closing.status === "corrected" ? "Corregido" : "Confirmado"}
                       </td>
@@ -488,12 +471,10 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
           <h2>Alcance del informe</h2>
           <p>
             Los cierres usan la fecha de operación; los gastos usan la fecha
-            en que se incurrió en ellos para el desglose por categoría; el
-            descuento aplicado a un cierre usa la fecha de cierre asignada y
-            los pagos se agrupan por fecha efectiva. El Reporte Z neto ya
-            incluye los gastos descontados. Facturas de proveedor y pagos se
-            reportan separados de los gastos. El informe no calcula utilidad
-            neta.
+            en que se incurrió en ellos y se restan del Reporte Z neto del
+            período. Los pagos se agrupan por fecha efectiva. Facturas de
+            proveedor y pagos se reportan separados de los gastos. El
+            informe no calcula utilidad neta.
           </p>
         </section>
       </div>

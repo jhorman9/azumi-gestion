@@ -29,14 +29,10 @@ const submissionErrorMessages: Record<string, string> = {
   invalid: "Revisa los datos del cierre.",
   duplicate: "Ya existe un cierre para esa fecha.",
   locked: "El estado del cierre cambió. Recarga la página para continuar.",
-  "deduction-exceeds-cash":
-    "Las salidas de caja y los gastos descontados superan el efectivo contado.",
   "outflow-exceeds-cash":
     "Las salidas de caja no pueden superar el efectivo contado.",
   "outflow-invalid":
     "Completa cada salida y verifica que su suma no supere el efectivo contado.",
-  "expenses-assigned":
-    "Este cierre tiene gastos asignados. Reasigna esos gastos antes de cambiar la fecha.",
   "not-found": "No se encontró el cierre.",
   failed: "No fue posible guardar los cambios.",
 };
@@ -421,7 +417,8 @@ export function ClosingForm({
             <h4>Ventas del Reporte Z</h4>
             <p>{totals ? formatMoney(totals.reportedSalesTotal) : "—"}</p>
             <span>
-              Efectivo neto + banco + Pedidos Ya; antes de gastos asignados
+              Efectivo neto + banco + Pedidos Ya; los gastos se descuentan del
+              saldo del período
             </span>
           </article>
           <article>

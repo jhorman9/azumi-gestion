@@ -4,10 +4,6 @@ import type { PoolConnection } from "mysql2/promise";
 import { getCurrentUser } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/roles";
 import { writeAuditLog } from "@/lib/finance/audit";
-import {
-  ClosingDeductionExceedsCashError,
-  refreshClosingExpenseDeduction,
-} from "@/lib/finance/closing-expenses";
 import { formFields } from "@/lib/finance/form";
 import { getDbPool } from "@/lib/db";
 import {
@@ -22,8 +18,6 @@ interface ExpenseRow extends RowDataPacket {
   incurred_on: string;
   amount: string;
   payment_method: "cash" | "card" | "yappy";
-  deduct_from_closing: number;
-  closing_operation_date: string | null;
   status: "paid" | "void";
 }
 
@@ -83,9 +77,7 @@ export async function POST(
 
     const [expenseRows] = await connection.execute<ExpenseRow[]>(
       `SELECT id, supplier_id, DATE_FORMAT(incurred_on, '%Y-%m-%d') AS incurred_on,
-              amount, payment_method, deduct_from_closing,
-              DATE_FORMAT(closing_operation_date, '%Y-%m-%d') AS closing_operation_date,
-              status
+              amount, payment_method, status
        FROM expenses
        WHERE id = ?
        FOR UPDATE`,
@@ -122,7 +114,6 @@ export async function POST(
     await connection.execute(
       `UPDATE expenses
        SET supplier_id = ?, incurred_on = ?, amount = ?, payment_method = ?,
-           deduct_from_closing = ?, closing_operation_date = ?,
            updated_at = UTC_TIMESTAMP(3)
        WHERE id = ?`,
       [
@@ -130,28 +121,9 @@ export async function POST(
         parsed.data.incurred_on,
         parsed.data.amount,
         parsed.data.payment_method,
-        parsed.data.deduct_from_closing ? 1 : 0,
-        parsed.data.deduct_from_closing
-          ? parsed.data.closing_operation_date
-          : null,
         id,
       ],
     );
-
-    const affectedDates = new Set<string>();
-    if (expense.deduct_from_closing && expense.closing_operation_date) {
-      affectedDates.add(expense.closing_operation_date);
-    }
-    if (
-      parsed.data.deduct_from_closing &&
-      parsed.data.closing_operation_date
-    ) {
-      affectedDates.add(parsed.data.closing_operation_date);
-    }
-
-    for (const operationDate of affectedDates) {
-      await refreshClosingExpenseDeduction(connection, operationDate, actor.id);
-    }
 
     await writeAuditLog(connection, {
       actorUserId: actor.id,
@@ -163,15 +135,8 @@ export async function POST(
         incurred_on: expense.incurred_on,
         amount: expense.amount,
         payment_method: expense.payment_method,
-        deduct_from_closing: Boolean(expense.deduct_from_closing),
-        closing_operation_date: expense.closing_operation_date,
       },
-      afterData: {
-        ...parsed.data,
-        closing_operation_date: parsed.data.deduct_from_closing
-          ? parsed.data.closing_operation_date
-          : null,
-      },
+      afterData: parsed.data,
     });
 
     await connection.commit();
@@ -184,10 +149,6 @@ export async function POST(
       } catch {
         console.error("Expense update rollback failed.");
       }
-    }
-
-    if (error instanceof ClosingDeductionExceedsCashError) {
-      return redirectToExpenses(request, "error=deduction-exceeds-cash");
     }
 
     const code =

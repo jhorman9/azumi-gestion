@@ -48,9 +48,10 @@ sesión y el permiso en el servidor.
   y ACH desglosa Reporte Z, no representa ventas adicionales. Total Banco es la
   suma de sus diez celdas y no vuelve a sumarse fuera del desglose.
 - El efectivo se captura como monto contado antes de las salidas. `cash_total`
-  y Reporte Z guardan el neto después de salidas de caja y gastos asignados; las
-  salidas conservan descripción e importe y no crean gastos. No se permite que
-  esas deducciones superen el efectivo contado.
+  y Reporte Z guardan el neto después de las salidas de caja; las salidas
+  conservan descripción e importe y no crean gastos. Los gastos se restan
+  aparte del saldo del período y nunca modifican un cierre. No se permite que
+  las salidas superen el efectivo contado.
 - La propina se captura como un único total diario. Se informa por separado,
   nunca se suma ni se resta del Reporte Z, el efectivo o el banco. La página de
   Propinas permite consultar totales por día, semana y mes.

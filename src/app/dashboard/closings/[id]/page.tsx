@@ -17,7 +17,6 @@ import {
   type ClosingFormDefaults,
 } from "@/lib/finance/closing";
 import {
-  expensePaymentMethodLabels,
   formatMoney,
   moneyToCents,
   sumMoney,
@@ -68,17 +67,6 @@ interface LegacyAdjustmentRow extends RowDataPacket {
   treatment: "included" | "excluded";
 }
 
-interface ExpenseDeductionRow extends RowDataPacket {
-  id: string | number;
-  incurred_on: string;
-  amount: string;
-  payment_method: "cash" | "card" | "yappy";
-  supplier_name: string;
-  last_action: string | null;
-  last_actor_name: string | null;
-  last_action_at: string | null;
-}
-
 interface AuditRow extends RowDataPacket {
   id: string | number;
   action: string;
@@ -98,14 +86,10 @@ const errorMessages: Record<string, string> = {
   invalid: "Revisa los datos y completa el motivo de la corrección.",
   duplicate: "Ya existe otro cierre para esa fecha.",
   locked: "El estado del cierre cambió. Recarga la página para continuar.",
-  "deduction-exceeds-cash":
-    "Las salidas de caja y los gastos descontados superan el efectivo contado.",
   "outflow-exceeds-cash":
     "Las salidas de caja no pueden superar el efectivo contado.",
   "outflow-invalid":
     "Completa cada salida y verifica que su suma no supere el efectivo contado.",
-  "expenses-assigned":
-    "Este cierre tiene gastos asignados. Reasigna esos gastos antes de cambiar la fecha.",
   "not-found": "No se encontró el cierre.",
   failed: "No fue posible guardar los cambios.",
 };
@@ -157,7 +141,6 @@ export default async function ClosingDetailPage({
     [cashOutflows],
     [legacyPayments],
     [legacyAdjustments],
-    [expenseDeductions],
     [auditEvents],
   ] = await Promise.all([
     pool.execute<ChannelPaymentRow[]>(
@@ -184,29 +167,6 @@ export default async function ClosingDetailPage({
        FROM daily_closing_adjustments
        WHERE daily_closing_id = ?`,
       [id],
-    ),
-    pool.execute<ExpenseDeductionRow[]>(
-      `SELECT e.id,
-              DATE_FORMAT(e.incurred_on, '%Y-%m-%d') AS incurred_on,
-              e.amount, e.payment_method, s.legal_name AS supplier_name,
-              a.action AS last_action,
-              au.name AS last_actor_name,
-              DATE_FORMAT(a.created_at, '%Y-%m-%dT%H:%i:%sZ') AS last_action_at
-       FROM expenses e
-       INNER JOIN suppliers s ON s.id = e.supplier_id
-       LEFT JOIN (
-         SELECT entity_id, MAX(id) AS audit_id
-         FROM audit_logs
-         WHERE entity_type = 'expense'
-         GROUP BY entity_id
-       ) latest ON latest.entity_id = CAST(e.id AS CHAR)
-       LEFT JOIN audit_logs a ON a.id = latest.audit_id
-       LEFT JOIN users au ON au.id = a.actor_user_id
-       WHERE e.closing_operation_date = ?
-         AND e.deduct_from_closing = 1
-         AND e.status = 'paid'
-       ORDER BY e.id`,
-      [closing.operation_date],
     ),
     pool.execute<AuditRow[]>(
       `SELECT a.id, a.action, u.name AS actor_name,
@@ -264,16 +224,9 @@ export default async function ClosingDetailPage({
   const bankTotal = sumMoney(
     channelPayments.map((payment) => payment.amount),
   );
-  const expenseDeductionTotal = sumMoney(
-    expenseDeductions.map((expense) => expense.amount),
-  );
-  const totalCashDeductions = sumMoney([
-    cashOutflowTotal,
-    expenseDeductionTotal,
-  ]);
-  const invalidExistingDeductions =
+  const invalidExistingOutflows =
     totals === null ||
-    moneyToCents(totalCashDeductions) > moneyToCents(closing.gross_cash_total);
+    moneyToCents(cashOutflowTotal) > moneyToCents(closing.gross_cash_total);
   const paramsValue = await searchParams;
   const error = firstValue(paramsValue.error);
   const updated = firstValue(paramsValue.updated);
@@ -310,9 +263,9 @@ export default async function ClosingDetailPage({
             {errorMessages[error] ?? "Ocurrió un error al guardar el cierre."}
           </p>
         ) : null}
-        {invalidExistingDeductions ? (
+        {invalidExistingOutflows ? (
           <p className="form-error" role="alert">
-            Las salidas y gastos de este cierre superan el efectivo contado.
+            Las salidas de caja de este cierre superan el efectivo contado.
             Ajusta los importes antes de guardar una corrección.
           </p>
         ) : null}
@@ -419,11 +372,11 @@ export default async function ClosingDetailPage({
         </section>
 
         <section className="dashboard-card">
-          <h2>Salidas y gastos descontados</h2>
+          <h2>Salidas de caja y total del cierre</h2>
           <p className="form-hint">
-            Las salidas de caja y los gastos asignados se restan del efectivo y
-            del Reporte Z. Los valores originales quedan conservados para
-            auditoría y recálculo.
+            Las salidas de caja reducen el efectivo y el Reporte Z de este
+            cierre. Los gastos se registran y restan aparte en el saldo del
+            período.
           </p>
           <div className="closing-totals">
             <article>
@@ -432,15 +385,10 @@ export default async function ClosingDetailPage({
               <span>{cashOutflows.length} salida(s) registrada(s)</span>
             </article>
             <article>
-              <h3>Gastos descontados</h3>
-              <p>{formatMoney(expenseDeductionTotal)}</p>
-              <span>{expenseDeductions.length} gasto(s) asignado(s)</span>
-            </article>
-            <article>
               <h3>Efectivo neto</h3>
               <p>{formatMoney(closing.cash_total)}</p>
               <span>
-                {formatMoney(closing.gross_cash_total)} menos salidas y gastos
+                {formatMoney(closing.gross_cash_total)} menos salidas de caja
               </span>
             </article>
             <article>
@@ -448,7 +396,7 @@ export default async function ClosingDetailPage({
               <p>{formatMoney(closing.reported_sales_total)}</p>
               <span>
                 {formatMoney(closing.gross_reported_sales_total)} menos salidas
-                y gastos
+                de caja
               </span>
             </article>
             <article>
@@ -476,44 +424,6 @@ export default async function ClosingDetailPage({
                       <td>{outflow.line_number}</td>
                       <td>{outflow.description}</td>
                       <td>{formatMoney(outflow.amount)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          {expenseDeductions.length === 0 ? (
-            <p className="empty-state">
-              No hay gastos asignados a la fecha de este cierre.
-            </p>
-          ) : (
-            <div className="table-scroll">
-              <table>
-                <thead>
-                  <tr>
-                    <th scope="col">Fecha</th>
-                    <th scope="col">Proveedor</th>
-                    <th scope="col">Importe</th>
-                    <th scope="col">Método de pago</th>
-                    <th scope="col">Último cambio</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {expenseDeductions.map((expense) => (
-                    <tr key={String(expense.id)}>
-                      <td>{expense.incurred_on}</td>
-                      <td>{expense.supplier_name}</td>
-                      <td>{formatMoney(expense.amount)}</td>
-                      <td>
-                        {expensePaymentMethodLabels[expense.payment_method]}
-                      </td>
-                      <td>
-                        <AuditLabel
-                          action={expense.last_action}
-                          actorName={expense.last_actor_name}
-                          occurredAt={expense.last_action_at}
-                        />
-                      </td>
                     </tr>
                   ))}
                 </tbody>

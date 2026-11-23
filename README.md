@@ -9,6 +9,23 @@ registro de gastos, directorio de proveedores, facturas con pagos parciales y
 reportes por período. Los reportes separan ventas, gastos incurridos, pagos y
 obligaciones; no calculan utilidad neta.
 
+## Resumen financiero
+
+El Dashboard muestra por mes o año:
+
+- **Saldo total sin gastos:** Reporte Z neto de los cierres confirmados o
+  corregidos del período.
+- **Gastos del período:** gastos pagados, agrupados por fecha del gasto.
+- **Saldo total con gastos:** saldo sin gastos menos los gastos del período;
+  puede ser negativo y no representa utilidad neta.
+- **Pagos pendientes y vencidos:** saldos actuales de facturas de proveedores,
+  independientes del rango seleccionado y del saldo del período.
+
+Los gastos reducen el saldo del período, pero no modifican cierres diarios. Las
+salidas de caja registradas dentro de un cierre sí reducen el efectivo y el
+Reporte Z de ese cierre. Los pagos de facturas reducen el saldo por pagar y no
+se registran de nuevo como gastos.
+
 ## Desarrollo local
 
 Requisitos: Node.js compatible con Next.js 16 y una instancia MySQL/MariaDB

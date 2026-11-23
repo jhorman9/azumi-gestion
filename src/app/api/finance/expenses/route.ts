@@ -4,10 +4,6 @@ import type { PoolConnection } from "mysql2/promise";
 import { getCurrentUser } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/roles";
 import { writeAuditLog } from "@/lib/finance/audit";
-import {
-  ClosingDeductionExceedsCashError,
-  refreshClosingExpenseDeduction,
-} from "@/lib/finance/closing-expenses";
 import { formFields } from "@/lib/finance/form";
 import { getDbPool } from "@/lib/db";
 import {
@@ -79,47 +75,26 @@ export async function POST(request: Request) {
 
     const [result] = await connection.execute<ResultSetHeader>(
       `INSERT INTO expenses
-        (supplier_id, incurred_on, amount, payment_method, deduct_from_closing,
-         closing_operation_date, status, paid_at, voided_at, created_by,
-         created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'paid', UTC_TIMESTAMP(3), NULL, ?,
+        (supplier_id, incurred_on, amount, payment_method, status, paid_at,
+         voided_at, created_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'paid', UTC_TIMESTAMP(3), NULL, ?,
          UTC_TIMESTAMP(3), UTC_TIMESTAMP(3))`,
       [
         parsed.data.supplier_id,
         parsed.data.incurred_on,
         parsed.data.amount,
         parsed.data.payment_method,
-        parsed.data.deduct_from_closing ? 1 : 0,
-        parsed.data.deduct_from_closing
-          ? parsed.data.closing_operation_date
-          : null,
         actor.id,
       ],
     );
     const expenseId = String(result.insertId);
-
-    if (
-      parsed.data.deduct_from_closing &&
-      parsed.data.closing_operation_date
-    ) {
-      await refreshClosingExpenseDeduction(
-        connection,
-        parsed.data.closing_operation_date,
-        actor.id,
-      );
-    }
 
     await writeAuditLog(connection, {
       actorUserId: actor.id,
       entityType: "expense",
       entityId: expenseId,
       action: "created",
-      afterData: {
-        ...parsed.data,
-        closing_operation_date: parsed.data.deduct_from_closing
-          ? parsed.data.closing_operation_date
-          : null,
-      },
+      afterData: parsed.data,
     });
     await connection.commit();
     transactionStarted = false;
@@ -131,10 +106,6 @@ export async function POST(request: Request) {
       } catch {
         console.error("Expense rollback failed.");
       }
-    }
-
-    if (error instanceof ClosingDeductionExceedsCashError) {
-      return redirectToExpenses(request, "error=deduction-exceeds-cash");
     }
 
     const code =

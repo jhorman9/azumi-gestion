@@ -16,16 +16,11 @@ const plotBottom = 224;
 const plotHeight = plotBottom - plotTop;
 const plotWidth = plotRight - plotLeft;
 const series = [
-  { key: "salesTotal", label: "Reporte Z neto", color: "#b4232c" },
+  { key: "salesTotal", label: "Reporte Z neto de cierres", color: "#b4232c" },
   {
-    key: "expenseDeducted",
-    label: "Marcados para descuento de cierre",
+    key: "expenseIncurred",
+    label: "Gastos (se restan del período)",
     color: "#d9942e",
-  },
-  {
-    key: "expenseNotDeducted",
-    label: "Sin descuento de cierre",
-    color: "#43886a",
   },
 ] as const;
 
@@ -202,8 +197,8 @@ export function FinanceTrendChart({
           Tendencia de Reporte Z neto y gastos del período seleccionado
         </title>
         <desc>
-          Compara Reporte Z neto y gastos por tratamiento de cierre, según la
-          fecha del gasto, por{" "}
+          Compara Reporte Z neto de los cierres y gastos por fecha del gasto,
+          por{" "}
           {granularity === "day" ? "día" : "mes"}.
         </desc>
         {[0, 1, 2, 3, 4].map((step) => {
@@ -331,7 +326,8 @@ export function FinanceTrendChart({
       ) : null}
       <p className="finance-chart-help" id="finance-trend-help">
         Pasa el cursor o toca el gráfico para consultar los valores. Con el
-        teclado, usa las flechas para recorrer los períodos.
+        teclado, usa las flechas para recorrer los períodos. Los gastos se
+        restan del saldo del período, no de los cierres diarios.
       </p>
       <ul aria-label="Series del gráfico" className="finance-trend-legend">
         {series.map((item) => (

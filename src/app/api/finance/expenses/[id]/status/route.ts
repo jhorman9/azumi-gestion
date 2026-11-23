@@ -4,7 +4,6 @@ import type { PoolConnection } from "mysql2/promise";
 import { getCurrentUser } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/roles";
 import { writeAuditLog } from "@/lib/finance/audit";
-import { refreshClosingExpenseDeduction } from "@/lib/finance/closing-expenses";
 import { formFields } from "@/lib/finance/form";
 import { getDbPool } from "@/lib/db";
 import {
@@ -19,9 +18,8 @@ interface ExpenseRow extends RowDataPacket {
   incurred_on: string;
   amount: string;
   payment_method: "cash" | "card" | "yappy";
-  deduct_from_closing: number;
-  closing_operation_date: string | null;
   status: "paid" | "void";
+  archived_at: Date | string | null;
 }
 
 function redirectToExpenses(request: Request, result: string) {
@@ -73,9 +71,7 @@ export async function POST(
     transactionStarted = true;
     const [rows] = await connection.execute<ExpenseRow[]>(
       `SELECT id, supplier_id, DATE_FORMAT(incurred_on, '%Y-%m-%d') AS incurred_on,
-              amount, payment_method, deduct_from_closing,
-              DATE_FORMAT(closing_operation_date, '%Y-%m-%d') AS closing_operation_date,
-              status
+              amount, payment_method, status, archived_at
        FROM expenses
        WHERE id = ?
        FOR UPDATE`,
@@ -89,48 +85,81 @@ export async function POST(
       return redirectToExpenses(request, "error=not-found");
     }
 
-    if (expense.status !== "paid") {
-      await connection.rollback();
-      transactionStarted = false;
-      return redirectToExpenses(request, "error=locked");
-    }
+    const beforeData = {
+      supplier_id: expense.supplier_id,
+      incurred_on: expense.incurred_on,
+      amount: expense.amount,
+      payment_method: expense.payment_method,
+      status: expense.status,
+      archived_at: expense.archived_at,
+    };
+    let auditAction: "voided" | "archived" | "restored";
+    let afterData: Record<string, unknown>;
+    let result: string;
 
-    await connection.execute(
-      `UPDATE expenses
-       SET status = 'void', voided_at = UTC_TIMESTAMP(3),
-           updated_at = UTC_TIMESTAMP(3)
-       WHERE id = ?`,
-      [id],
-    );
+    if (parsed.data.action === "void") {
+      if (expense.status !== "paid" || expense.archived_at !== null) {
+        await connection.rollback();
+        transactionStarted = false;
+        return redirectToExpenses(request, "error=locked");
+      }
 
-    if (expense.deduct_from_closing && expense.closing_operation_date) {
-      await refreshClosingExpenseDeduction(
-        connection,
-        expense.closing_operation_date,
-        actor.id,
+      await connection.execute(
+        `UPDATE expenses
+         SET status = 'void', voided_at = UTC_TIMESTAMP(3),
+             updated_at = UTC_TIMESTAMP(3)
+         WHERE id = ?`,
+        [id],
       );
+      auditAction = "voided";
+      afterData = { status: "void" };
+      result = "updated=voided";
+    } else if (parsed.data.action === "archive") {
+      if (expense.status !== "void" || expense.archived_at !== null) {
+        await connection.rollback();
+        transactionStarted = false;
+        return redirectToExpenses(request, "error=locked");
+      }
+
+      await connection.execute(
+        `UPDATE expenses
+         SET archived_at = UTC_TIMESTAMP(3), updated_at = UTC_TIMESTAMP(3)
+         WHERE id = ?`,
+        [id],
+      );
+      auditAction = "archived";
+      afterData = { archived: true };
+      result = "updated=archived&archived=1";
+    } else {
+      if (expense.status !== "void" || expense.archived_at === null) {
+        await connection.rollback();
+        transactionStarted = false;
+        return redirectToExpenses(request, "error=locked");
+      }
+
+      await connection.execute(
+        `UPDATE expenses
+         SET archived_at = NULL, updated_at = UTC_TIMESTAMP(3)
+         WHERE id = ?`,
+        [id],
+      );
+      auditAction = "restored";
+      afterData = { archived: false };
+      result = "updated=restored";
     }
 
     await writeAuditLog(connection, {
       actorUserId: actor.id,
       entityType: "expense",
       entityId: id,
-      action: "voided",
-      beforeData: {
-        supplier_id: expense.supplier_id,
-        incurred_on: expense.incurred_on,
-        amount: expense.amount,
-        payment_method: expense.payment_method,
-        deduct_from_closing: Boolean(expense.deduct_from_closing),
-        closing_operation_date: expense.closing_operation_date,
-        status: expense.status,
-      },
-      afterData: { status: "void" },
+      action: auditAction,
+      beforeData,
+      afterData,
     });
 
     await connection.commit();
     transactionStarted = false;
-    return redirectToExpenses(request, "updated=1");
+    return redirectToExpenses(request, result);
   } catch (error) {
     if (transactionStarted && connection) {
       try {

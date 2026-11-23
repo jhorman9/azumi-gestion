@@ -8,8 +8,9 @@ const actionLabels: Record<string, string> = {
   paid: "Pagado",
   recorded: "Pago registrado",
   voided: "Anulado",
+  archived: "Archivado",
+  restored: "Restaurado",
   status_changed: "Estado actualizado",
-  expense_deduction_adjusted: "Descuento del cierre actualizado",
   cash_outflow_deduction_adjusted: "Salida de caja descontada",
   bootstrap_admin_created: "Administrador creado",
 };

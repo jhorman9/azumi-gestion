@@ -5,10 +5,6 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/roles";
 import { writeAuditLog } from "@/lib/finance/audit";
 import {
-  ClosingDeductionExceedsCashError,
-  refreshClosingExpenseDeduction,
-} from "@/lib/finance/closing-expenses";
-import {
   calculateClosingTotals,
   collectClosingFormFields,
 } from "@/lib/finance/closing";
@@ -37,10 +33,6 @@ interface ClosingRow extends RowDataPacket {
   notes: string | null;
   confirmed_by: string | number | null;
   confirmed_at: string | null;
-}
-
-interface AssignedExpenseRow extends RowDataPacket {
-  id: string | number;
 }
 
 interface PaymentRow extends RowDataPacket {
@@ -177,23 +169,6 @@ export async function POST(
       return redirectToClosing(request, id, "error=locked");
     }
 
-    if (parsed.data.operation_date !== closing.operation_date) {
-      const [assignedExpenses] = await connection.execute<AssignedExpenseRow[]>(
-        `SELECT id
-         FROM expenses
-         WHERE closing_operation_date = ?
-           AND deduct_from_closing = 1
-           AND status = 'paid'
-         FOR UPDATE`,
-        [closing.operation_date],
-      );
-      if (assignedExpenses.length > 0) {
-        await connection.rollback();
-        transactionStarted = false;
-        return redirectToClosing(request, id, "error=expenses-assigned");
-      }
-    }
-
     const [oldPayments] = await connection.execute<PaymentRow[]>(
       `SELECT payment_method, amount
        FROM daily_closing_payments
@@ -318,22 +293,14 @@ export async function POST(
        ORDER BY line_number`,
       [id],
     );
-    const adjustedClosing = await refreshClosingExpenseDeduction(
-      connection,
-      parsed.data.operation_date,
-      actor.id,
-      false,
-    );
     const afterData = {
       operation_date: parsed.data.operation_date,
-      reported_sales_total:
-        adjustedClosing?.reportedSalesTotal ?? totals.reportedSalesTotal,
+      reported_sales_total: totals.reportedSalesTotal,
       gross_reported_sales_total: totals.grossReportedSalesTotal,
       pedidos_ya_total: parsed.data.pedidos_ya_total,
-      cash_total: adjustedClosing?.cashTotal ?? parsed.data.cash_total,
+      cash_total: totals.cashTotal,
       gross_cash_total: totals.grossCashTotal,
       cash_outflow_total: totals.cashOutflowTotal,
-      expense_deduction_total: adjustedClosing?.deductionTotal ?? "0.00",
       tips_total: totals.tipsTotal,
       status: newStatus,
       notes: parsed.data.notes,
@@ -390,10 +357,6 @@ export async function POST(
 
     if (code === "ER_DUP_ENTRY") {
       return redirectToClosing(request, id, "error=duplicate");
-    }
-
-    if (error instanceof ClosingDeductionExceedsCashError) {
-      return redirectToClosing(request, id, "error=deduction-exceeds-cash");
     }
 
     console.error(`Daily closing update failed (${code}).`);

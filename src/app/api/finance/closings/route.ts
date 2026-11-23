@@ -5,10 +5,6 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/roles";
 import { writeAuditLog } from "@/lib/finance/audit";
 import {
-  ClosingDeductionExceedsCashError,
-  refreshClosingExpenseDeduction,
-} from "@/lib/finance/closing-expenses";
-import {
   calculateClosingTotals,
   collectClosingFormFields,
 } from "@/lib/finance/closing";
@@ -140,13 +136,6 @@ export async function POST(request: Request) {
       );
     }
 
-    const adjustedClosing = await refreshClosingExpenseDeduction(
-      connection,
-      parsed.data.operation_date,
-      actor.id,
-      false,
-    );
-
     await writeAuditLog(connection, {
       actorUserId: actor.id,
       entityType: "daily_closing",
@@ -154,14 +143,12 @@ export async function POST(request: Request) {
       action: confirmed ? "confirmed" : "created",
       afterData: {
         operation_date: parsed.data.operation_date,
-        reported_sales_total:
-          adjustedClosing?.reportedSalesTotal ?? totals.reportedSalesTotal,
+        reported_sales_total: totals.reportedSalesTotal,
         gross_reported_sales_total: totals.grossReportedSalesTotal,
         pedidos_ya_total: parsed.data.pedidos_ya_total,
-        cash_total: adjustedClosing?.cashTotal ?? parsed.data.cash_total,
+        cash_total: totals.cashTotal,
         gross_cash_total: totals.grossCashTotal,
         cash_outflow_total: totals.cashOutflowTotal,
-        expense_deduction_total: adjustedClosing?.deductionTotal ?? "0.00",
         tips_total: totals.tipsTotal,
         channel_payments: parsed.data.channel_payments,
         cash_outflows: parsed.data.cash_outflows,
@@ -194,10 +181,6 @@ export async function POST(request: Request) {
 
     if (code === "ER_DUP_ENTRY") {
       return redirectToClosings(request, "error=duplicate");
-    }
-
-    if (error instanceof ClosingDeductionExceedsCashError) {
-      return redirectToClosings(request, "error=deduction-exceeds-cash");
     }
 
     console.error(`Daily closing creation failed (${code}).`);

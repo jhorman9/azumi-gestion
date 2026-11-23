@@ -14,19 +14,12 @@ export interface FinanceTrendPoint {
   bucket: string;
   label: string;
   salesTotal: string;
-  expenseDeducted: string;
-  expenseNotDeducted: string;
-}
-
-export interface FinanceTrendExpenseAmount {
-  bucket: string;
-  deducted: string;
-  notDeducted: string;
+  expenseIncurred: string;
 }
 
 interface FinanceTrendSources {
   sales: readonly FinanceTrendAmount[];
-  expenseTreatment: readonly FinanceTrendExpenseAmount[];
+  expensesIncurred: readonly FinanceTrendAmount[];
 }
 
 function bucketsForRange(
@@ -81,24 +74,12 @@ export function buildFinanceTrend(
   sources: FinanceTrendSources,
 ): FinanceTrendPoint[] {
   const sales = amountByBucket(sources.sales);
-  const expenses = new Map(
-    sources.expenseTreatment.map((expense) => [
-      expense.bucket,
-      {
-        deducted: expense.deducted,
-        notDeducted: expense.notDeducted,
-      },
-    ]),
-  );
+  const expensesIncurred = amountByBucket(sources.expensesIncurred);
 
-  return bucketsForRange(range, granularity).map((bucket) => {
-    const expense = expenses.get(bucket);
-    return {
-      bucket,
-      label: formatBucketLabel(bucket, granularity),
-      salesTotal: sales.get(bucket) ?? "0.00",
-      expenseDeducted: expense?.deducted ?? "0.00",
-      expenseNotDeducted: expense?.notDeducted ?? "0.00",
-    };
-  });
+  return bucketsForRange(range, granularity).map((bucket) => ({
+    bucket,
+    label: formatBucketLabel(bucket, granularity),
+    salesTotal: sales.get(bucket) ?? "0.00",
+    expenseIncurred: expensesIncurred.get(bucket) ?? "0.00",
+  }));
 }

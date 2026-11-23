@@ -8,7 +8,6 @@ import {
 import {
   buildFinanceTrend,
   type FinanceTrendAmount,
-  type FinanceTrendExpenseAmount,
   type FinanceTrendGranularity,
   type FinanceTrendPoint,
 } from "@/lib/finance/trend";
@@ -16,11 +15,8 @@ import { subtractMoneyAllowNegative } from "@/lib/finance/money";
 
 export interface FinanceSummary {
   salesTotal: string;
-  salesAfterUnassignedExpenses: string;
+  salesAfterExpenses: string;
   expenseIncurred: string;
-  expenseIncurredDeducted: string;
-  expenseIncurredNotDeducted: string;
-  closingExpenseDeductions: string;
   expensePaid: string;
   supplierBillsIssued: string;
   supplierPayments: string;
@@ -28,16 +24,64 @@ export interface FinanceSummary {
   overduePayables: string;
 }
 
+export interface PayablesSummary {
+  totalAmount: string;
+  totalCount: number;
+  overdueAmount: string;
+  overdueCount: number;
+}
+
 interface AmountRow extends RowDataPacket {
   amount: string;
-  overdue_amount?: string;
-  deducted_amount?: string;
-  not_deducted_amount?: string;
+}
+
+interface PayablesRow extends RowDataPacket {
+  amount: string;
+  overdue_amount: string;
+  total_count: number | string;
+  overdue_count: number | string;
 }
 
 interface TrendRow extends RowDataPacket, FinanceTrendAmount {}
 
-interface TrendExpenseRow extends RowDataPacket, FinanceTrendExpenseAmount {}
+export async function getPayablesSummary(pool: Pool): Promise<PayablesSummary> {
+  const today = todayInPanama();
+  const [rows] = await pool.execute<PayablesRow[]>(
+    `SELECT
+       COUNT(*) AS total_count,
+       COALESCE(SUM(b.amount - COALESCE(p.paid_total, 0.00)), 0.00) AS amount,
+       COALESCE(SUM(
+         CASE
+           WHEN b.due_date IS NOT NULL AND b.due_date < ?
+           THEN b.amount - COALESCE(p.paid_total, 0.00)
+           ELSE 0.00
+         END
+       ), 0.00) AS overdue_amount,
+       COALESCE(SUM(
+         CASE
+           WHEN b.due_date IS NOT NULL AND b.due_date < ? THEN 1
+           ELSE 0
+         END
+       ), 0) AS overdue_count
+     FROM purchase_bills b
+     LEFT JOIN (
+       SELECT purchase_bill_id, SUM(amount) AS paid_total
+       FROM bill_payments
+       GROUP BY purchase_bill_id
+     ) p ON p.purchase_bill_id = b.id
+     WHERE b.status = 'open'
+       AND b.amount > COALESCE(p.paid_total, 0.00)`,
+    [today, today],
+  );
+  const row = rows[0];
+
+  return {
+    totalAmount: row?.amount ?? "0.00",
+    totalCount: Number(row?.total_count ?? 0),
+    overdueAmount: row?.overdue_amount ?? "0.00",
+    overdueCount: Number(row?.overdue_count ?? 0),
+  };
+}
 
 export async function getFinanceTrend(
   pool: Pool,
@@ -56,10 +100,9 @@ export async function getFinanceTrend(
        GROUP BY bucket`,
       [bucketFormat, range.start, range.end],
     ),
-    pool.execute<TrendExpenseRow[]>(
+    pool.execute<TrendRow[]>(
       `SELECT DATE_FORMAT(incurred_on, ?) AS bucket,
-              COALESCE(SUM(CASE WHEN deduct_from_closing = 1 THEN amount ELSE 0.00 END), 0.00) AS deducted,
-              COALESCE(SUM(CASE WHEN deduct_from_closing = 0 THEN amount ELSE 0.00 END), 0.00) AS not_deducted
+              COALESCE(SUM(amount), 0.00) AS amount
        FROM expenses
        WHERE status = 'paid'
          AND incurred_on BETWEEN ? AND ?
@@ -70,7 +113,7 @@ export async function getFinanceTrend(
 
   return buildFinanceTrend(range, granularity, {
     sales: salesRows,
-    expenseTreatment: expenseRows,
+    expensesIncurred: expenseRows,
   });
 }
 
@@ -79,15 +122,13 @@ export async function getFinanceSummary(
   range: DateRange,
 ): Promise<FinanceSummary> {
   const { startUtc, endUtcExclusive } = businessRangeUtc(range.start, range.end);
-  const today = todayInPanama();
   const [
     [salesRows],
     [incurredRows],
-    [closingDeductionRows],
     [expensePaymentRows],
     [billRows],
     [billPaymentRows],
-    [payableRows],
+    payablesSummary,
   ] = await Promise.all([
     pool.execute<AmountRow[]>(
       `SELECT COALESCE(SUM(reported_sales_total), 0.00) AS amount
@@ -97,23 +138,10 @@ export async function getFinanceSummary(
       [range.start, range.end],
     ),
     pool.execute<AmountRow[]>(
-      `SELECT COALESCE(SUM(amount), 0.00) AS amount,
-              COALESCE(SUM(CASE WHEN deduct_from_closing = 1 THEN amount ELSE 0.00 END), 0.00) AS deducted_amount,
-              COALESCE(SUM(CASE WHEN deduct_from_closing = 0 THEN amount ELSE 0.00 END), 0.00) AS not_deducted_amount
+      `SELECT COALESCE(SUM(amount), 0.00) AS amount
        FROM expenses
        WHERE status = 'paid'
          AND incurred_on BETWEEN ? AND ?`,
-      [range.start, range.end],
-    ),
-    pool.execute<AmountRow[]>(
-      `SELECT COALESCE(SUM(e.amount), 0.00) AS amount
-       FROM expenses e
-       INNER JOIN daily_closings c
-         ON c.operation_date = e.closing_operation_date
-       WHERE e.status = 'paid'
-         AND e.deduct_from_closing = 1
-         AND c.status IN ('confirmed', 'corrected')
-         AND c.operation_date BETWEEN ? AND ?`,
       [range.start, range.end],
     ),
     pool.execute<AmountRow[]>(
@@ -136,47 +164,20 @@ export async function getFinanceSummary(
        WHERE paid_at >= ? AND paid_at < ?`,
       [startUtc, endUtcExclusive],
     ),
-    pool.execute<AmountRow[]>(
-      `SELECT
-         COALESCE(SUM(b.amount - COALESCE(p.paid_total, 0.00)), 0.00) AS amount,
-         COALESCE(SUM(
-           CASE
-             WHEN b.due_date IS NOT NULL AND b.due_date < ?
-             THEN b.amount - COALESCE(p.paid_total, 0.00)
-             ELSE 0.00
-           END
-         ), 0.00) AS overdue_amount
-       FROM purchase_bills b
-       LEFT JOIN (
-         SELECT purchase_bill_id, SUM(amount) AS paid_total
-         FROM bill_payments
-         GROUP BY purchase_bill_id
-       ) p ON p.purchase_bill_id = b.id
-       WHERE b.status = 'open'
-         AND b.amount > COALESCE(p.paid_total, 0.00)`,
-      [today],
-    ),
+    getPayablesSummary(pool),
   ]);
 
   const salesTotal = salesRows[0]?.amount ?? "0.00";
-  const expensesWithoutClosing = incurredRows[0]?.not_deducted_amount ?? "0.00";
+  const expenseIncurred = incurredRows[0]?.amount ?? "0.00";
 
   return {
     salesTotal,
-    salesAfterUnassignedExpenses: subtractMoneyAllowNegative(
-      salesTotal,
-      expensesWithoutClosing,
-    ),
-    expenseIncurred: incurredRows[0]?.amount ?? "0.00",
-    expenseIncurredDeducted:
-      incurredRows[0]?.deducted_amount ?? "0.00",
-    expenseIncurredNotDeducted:
-      incurredRows[0]?.not_deducted_amount ?? "0.00",
-    closingExpenseDeductions: closingDeductionRows[0]?.amount ?? "0.00",
+    salesAfterExpenses: subtractMoneyAllowNegative(salesTotal, expenseIncurred),
+    expenseIncurred,
     expensePaid: expensePaymentRows[0]?.amount ?? "0.00",
     supplierBillsIssued: billRows[0]?.amount ?? "0.00",
     supplierPayments: billPaymentRows[0]?.amount ?? "0.00",
-    outstandingPayables: payableRows[0]?.amount ?? "0.00",
-    overduePayables: payableRows[0]?.overdue_amount ?? "0.00",
+    outstandingPayables: payablesSummary.totalAmount,
+    overduePayables: payablesSummary.overdueAmount,
   };
 }

@@ -15,7 +15,9 @@ import {
 import {
   expensePaymentMethodLabels,
   formatMoney,
+  subtractMoneyAllowNegative,
 } from "@/lib/finance/money";
+import { getPayablesSummary } from "@/lib/finance/report";
 
 export const instant = false;
 
@@ -31,9 +33,7 @@ interface ExpenseRow extends RowDataPacket {
   amount: string;
   payment_method: keyof typeof expensePaymentMethodLabels;
   status: "paid" | "void";
-  deduct_from_closing: number;
-  closing_operation_date: string | null;
-  closing_status: "draft" | "confirmed" | "corrected" | null;
+  archived_at: Date | string | null;
   supplier_name: string;
   last_action: string | null;
   last_actor_name: string | null;
@@ -47,16 +47,17 @@ interface CountRow extends RowDataPacket {
 interface ExpenseMonthlySummaryRow extends RowDataPacket {
   total_count: number | string;
   total_amount: string;
-  unassigned_count: number | string;
-  unassigned_amount: string;
-  assigned_count: number | string;
-  assigned_amount: string;
+}
+
+interface MonthlySalesRow extends RowDataPacket {
+  total_amount: string;
 }
 
 interface ExpensesPageProps {
   searchParams: Promise<{
     page?: string | string[];
     month?: string | string[];
+    archived?: string | string[];
     created?: string | string[];
     updated?: string | string[];
     error?: string | string[];
@@ -74,9 +75,7 @@ function errorMessage(code?: string): string | undefined {
   const messages: Record<string, string> = {
     invalid: "Revisa los datos del gasto y selecciona un proveedor activo.",
     "not-found": "No se encontró el gasto.",
-    locked: "El gasto anulado no puede modificarse.",
-    "deduction-exceeds-cash":
-      "El gasto supera el efectivo disponible del cierre seleccionado.",
+    locked: "La acción no está permitida para el estado actual del gasto.",
     failed: "No fue posible guardar los cambios.",
   };
   return messages[code] ?? "Ocurrió un error.";
@@ -89,8 +88,6 @@ function ExpenseFields({
   incurredOn,
   amount = "",
   paymentMethod = "cash",
-  deductFromClosing = false,
-  closingDate,
 }: {
   suppliers: SupplierOptionRow[];
   today: string;
@@ -98,8 +95,6 @@ function ExpenseFields({
   incurredOn: string;
   amount?: string;
   paymentMethod?: keyof typeof expensePaymentMethodLabels;
-  deductFromClosing?: boolean;
-  closingDate?: string | null;
 }) {
   return (
     <>
@@ -161,35 +156,6 @@ function ExpenseFields({
           </small>
         </label>
       </div>
-      <label>
-        Tratamiento en el cierre
-        <select
-          defaultValue={deductFromClosing ? "1" : "0"}
-          name="deduct_from_closing"
-          required
-        >
-          <option value="0">No descontar de un cierre</option>
-          <option value="1">
-            Sí, descontar del efectivo y del Reporte Z
-          </option>
-        </select>
-        <small className="field-hint">
-          Elige explícitamente si este gasto debe reducir un cierre diario.
-        </small>
-      </label>
-      <label>
-        Día del cierre al que se descontará
-        <input
-          defaultValue={closingDate ?? today}
-          max={today}
-          name="closing_operation_date"
-          type="date"
-        />
-        <small className="field-hint">
-          Elige la fecha del cierre relacionado. Solo se usa si seleccionas
-          descontar el gasto.
-        </small>
-      </label>
     </>
   );
 }
@@ -210,30 +176,53 @@ export default async function ExpensesPage({
       : currentMonth;
   const monthRange =
     month === currentMonth ? currentMonthRange : businessMonthRange(month);
+  const showArchived = firstValue(params.archived) === "1";
+  const archiveFilter = showArchived ? "IS NOT NULL" : "IS NULL";
   const pool = getDbPool();
-  const [suppliers, expenseCounts, monthlyExpenseRows] = await Promise.all([
-    pool.execute<SupplierOptionRow[]>(
-      `SELECT id, legal_name
-       FROM suppliers
-       WHERE is_active = 1
-       ORDER BY legal_name`,
-    ),
-    pool.execute<CountRow[]>("SELECT COUNT(*) AS total FROM expenses"),
-    pool.execute<ExpenseMonthlySummaryRow[]>(
-       `SELECT COUNT(*) AS total_count,
-               COALESCE(SUM(amount), 0.00) AS total_amount,
-               COUNT(CASE WHEN deduct_from_closing = 0 THEN 1 END) AS unassigned_count,
-               COALESCE(SUM(CASE WHEN deduct_from_closing = 0 THEN amount ELSE 0.00 END), 0.00) AS unassigned_amount,
-               COUNT(CASE WHEN deduct_from_closing = 1 THEN 1 END) AS assigned_count,
-               COALESCE(SUM(CASE WHEN deduct_from_closing = 1 THEN amount ELSE 0.00 END), 0.00) AS assigned_amount
+  const [
+    suppliers,
+    expenseCounts,
+    monthlyExpenseRows,
+    monthlySalesRows,
+    payablesSummary,
+  ] = await Promise.all([
+      pool.execute<SupplierOptionRow[]>(
+        `SELECT id, legal_name
+         FROM suppliers
+         WHERE is_active = 1
+         ORDER BY legal_name`,
+      ),
+      pool.execute<CountRow[]>(
+        `SELECT COUNT(*) AS total
+         FROM expenses
+         WHERE archived_at ${archiveFilter}`,
+      ),
+      pool.execute<ExpenseMonthlySummaryRow[]>(
+        `SELECT COUNT(*) AS total_count,
+                COALESCE(SUM(amount), 0.00) AS total_amount
         FROM expenses
         WHERE status = 'paid'
           AND incurred_on BETWEEN ? AND ?`,
-       [monthRange.start, monthRange.end],
-    ),
+        [monthRange.start, monthRange.end],
+      ),
+      pool.execute<MonthlySalesRow[]>(
+        `SELECT COALESCE(SUM(reported_sales_total), 0.00) AS total_amount
+        FROM daily_closings
+        WHERE status IN ('confirmed', 'corrected')
+          AND operation_date BETWEEN ? AND ?`,
+        [monthRange.start, monthRange.end],
+      ),
+      getPayablesSummary(pool),
   ]);
   const expenseTotal = Number(expenseCounts[0][0]?.total ?? 0);
   const monthlySummary = monthlyExpenseRows[0][0];
+  const monthlySales = monthlySalesRows[0][0]?.total_amount ?? "0.00";
+  const monthlyExpenses = monthlySummary?.total_amount ?? "0.00";
+  const monthlyBalance = subtractMoneyAllowNegative(
+    monthlySales,
+    monthlyExpenses,
+  );
+  const monthlyBalanceIsLoss = monthlyBalance.startsWith("-");
   const pageCount = Math.max(1, Math.ceil(expenseTotal / pageSize));
   const requestedPage = Number(firstValue(params.page) ?? "1");
   const page =
@@ -244,18 +233,13 @@ export default async function ExpensesPage({
   const [expenseRows] = await pool.execute<ExpenseRow[]>(
     `SELECT e.id,
             DATE_FORMAT(e.incurred_on, '%Y-%m-%d') AS incurred_on,
-            e.supplier_id, e.amount, e.payment_method, e.status,
-            e.deduct_from_closing,
-            DATE_FORMAT(e.closing_operation_date, '%Y-%m-%d') AS closing_operation_date,
-            c.status AS closing_status,
+            e.supplier_id, e.amount, e.payment_method, e.status, e.archived_at,
             s.legal_name AS supplier_name,
             a.action AS last_action,
             au.name AS last_actor_name,
             DATE_FORMAT(a.created_at, '%Y-%m-%dT%H:%i:%sZ') AS last_action_at
      FROM expenses e
      INNER JOIN suppliers s ON s.id = e.supplier_id
-     LEFT JOIN daily_closings c
-       ON c.operation_date = e.closing_operation_date
      LEFT JOIN (
        SELECT entity_id, MAX(id) AS audit_id
        FROM audit_logs
@@ -264,6 +248,7 @@ export default async function ExpensesPage({
      ) latest ON latest.entity_id = CAST(e.id AS CHAR)
      LEFT JOIN audit_logs a ON a.id = latest.audit_id
      LEFT JOIN users au ON au.id = a.actor_user_id
+     WHERE e.archived_at ${archiveFilter}
      ORDER BY e.incurred_on DESC, e.id DESC
      LIMIT ? OFFSET ?`,
     [pageSize, offset],
@@ -272,8 +257,17 @@ export default async function ExpensesPage({
   const error = firstValue(params.error);
   const created = firstValue(params.created);
   const updated = firstValue(params.updated);
-  const pageHref = (nextPage: number) => {
+  const queryForView = (archived: boolean) => {
     const query = new URLSearchParams({ month });
+    if (archived) {
+      query.set("archived", "1");
+    }
+    return query;
+  };
+  const viewHref = (archived: boolean) =>
+    `/dashboard/expenses?${queryForView(archived).toString()}`;
+  const pageHref = (nextPage: number) => {
+    const query = queryForView(showArchived);
     if (nextPage > 1) {
       query.set("page", String(nextPage));
     }
@@ -289,31 +283,12 @@ export default async function ExpensesPage({
             <p className="eyebrow">Finanzas</p>
             <h1>Gastos</h1>
             <p className="page-heading-subtitle">
-              Distingue los gastos asignados a un cierre de los que no afectan
-              ningún cierre.
+              Los gastos no se descuentan de cierres diarios; se restan del
+              saldo del período según la fecha del gasto.
             </p>
           </div>
           <p>Registra el proveedor, el importe y cómo se pagó.</p>
         </div>
-        <section
-          aria-label="Cómo afectan los gastos a los cierres"
-          className="expense-treatment-guide"
-        >
-          <article className="expense-treatment-guide-item expense-guide-deducted">
-            <strong>Descontado del cierre</strong>
-            <p>
-              Reduce el efectivo y el Reporte Z neto del cierre elegido. Ya
-              aparece descontado en ese Reporte Z; no lo restes otra vez.
-            </p>
-          </article>
-          <article className="expense-treatment-guide-item expense-guide-not-deducted">
-            <strong>No descontado del cierre</strong>
-            <p>
-              Se registra como gasto, pero no modifica el efectivo ni el
-              Reporte Z de ningún cierre.
-            </p>
-          </article>
-        </section>
         <section
           aria-label={`Estadística mensual de gastos para ${month}`}
           className="dashboard-card expense-monthly-summary"
@@ -321,14 +296,14 @@ export default async function ExpensesPage({
           <div className="section-heading">
             <div>
               <p className="eyebrow">Control mensual</p>
-              <h2>Gastos que se restan del período</h2>
+              <h2>Impacto de gastos en el período</h2>
             </div>
             <form
               action="/dashboard/expenses"
               className="inline-form expense-month-filter"
               method="get"
             >
-              <label htmlFor="expense-summary-month">Mes del gasto</label>
+              <label htmlFor="expense-summary-month">Mes del resumen</label>
               <input
                 defaultValue={month}
                 id="expense-summary-month"
@@ -339,36 +314,59 @@ export default async function ExpensesPage({
               <button type="submit">Consultar</button>
             </form>
           </div>
+          <p className="expense-monthly-context">
+            Compara el Reporte Z de los cierres confirmados o corregidos con
+            los gastos pagados por fecha del gasto. Los gastos no modifican
+            cierres.
+          </p>
           <div className="expense-monthly-stat-grid">
-            <article className="expense-monthly-stat expense-monthly-stat-deduct">
-              <h3>Monto que se resta del Reporte Z del mes</h3>
-              <strong>{formatMoney(monthlySummary?.unassigned_amount)}</strong>
-              <p>
-                {monthlySummary?.unassigned_count ?? 0} gastos sin asignación a
-                cierre, por fecha del gasto.
-              </p>
+            <article className="expense-monthly-stat">
+              <h3>Saldo total del período sin gastos</h3>
+              <strong>{formatMoney(monthlySales)}</strong>
+              <p>Reporte Z neto de los cierres del mes seleccionado.</p>
             </article>
             <article className="expense-monthly-stat">
-              <h3>Gastos asignados a cierres</h3>
-              <strong>{formatMoney(monthlySummary?.assigned_amount)}</strong>
+              <h3>Gastos pagados</h3>
+              <strong>{formatMoney(monthlyExpenses)}</strong>
               <p>
-                {monthlySummary?.assigned_count ?? 0} gastos. Se descuentan en
-                la fecha del cierre asignado.
+                {monthlySummary?.total_count ?? 0} gastos, agrupados por fecha
+                del gasto; anulados excluidos.
               </p>
             </article>
-            <article className="expense-monthly-stat">
-              <h3>Total de gastos pagados del mes</h3>
-              <strong>{formatMoney(monthlySummary?.total_amount)}</strong>
+            <article
+              className={`expense-monthly-stat expense-monthly-stat-balance${
+                monthlyBalanceIsLoss ? " is-loss" : ""
+              }`}
+            >
+              <h3>Saldo total del período con gastos</h3>
+              <strong>{formatMoney(monthlyBalance)}</strong>
               <p>
-                {monthlySummary?.total_count ?? 0} gastos por fecha del gasto;
-                anulados excluidos.
+                {monthlyBalanceIsLoss
+                  ? "El período registra una pérdida."
+                  : "Reporte Z neto menos todos los gastos pagados del mes."}
               </p>
+            </article>
+            <article className="expense-monthly-stat expense-monthly-stat-payables">
+              <h3>Pagos pendientes actuales</h3>
+              <strong>{formatMoney(payablesSummary.totalAmount)}</strong>
+              <p>
+                {payablesSummary.totalCount}{" "}
+                {payablesSummary.totalCount === 1
+                  ? "factura con saldo pendiente"
+                  : "facturas con saldo pendiente"}
+                . Vencido: {formatMoney(payablesSummary.overdueAmount)}
+              </p>
+              <Link className="text-link" href="/dashboard/bills">
+                Ver cuentas por pagar
+              </Link>
             </article>
           </div>
-          <p className="expense-treatment-note">
-            El primer importe se resta del Reporte Z neto del resumen cuando
-            ambos consultan el mismo mes. Los gastos asignados a cierres se
-            descuentan en la fecha asignada y no se restan otra vez.
+          <p className="expense-monthly-note">
+            Anulados no se incluyen. El selector solo cambia este resumen; el
+            historial de abajo sigue mostrando todos los gastos. Los pagos
+            pendientes son saldos actuales de facturas y se muestran por
+            separado: no se agregan a los gastos ni se descuentan del saldo del
+            período.
           </p>
         </section>
         {created ? (
@@ -378,7 +376,13 @@ export default async function ExpensesPage({
         ) : null}
         {updated ? (
           <p className="success-message" role="status">
-            Gasto actualizado y cierre recalculado.
+            {updated === "archived"
+              ? "Gasto anulado archivado."
+              : updated === "restored"
+                ? "Gasto restaurado al historial."
+                : updated === "voided"
+                  ? "Gasto anulado."
+                  : "Gasto actualizado y saldo del período recalculado."}
           </p>
         ) : null}
         {error ? (
@@ -395,8 +399,8 @@ export default async function ExpensesPage({
             </div>
           </div>
           <p className="form-hint">
-            Elige si el gasto reduce el cierre. Los importes asignados a un
-            cierre ya están incluidos en su Reporte Z neto.
+            El gasto se restará del saldo del período por su fecha; no afecta
+            el efectivo ni el Reporte Z de un cierre diario.
           </p>
           {supplierRows.length === 0 ? (
             <p className="form-hint">
@@ -418,7 +422,7 @@ export default async function ExpensesPage({
           <div className="section-heading">
             <div>
               <p className="eyebrow">Movimientos</p>
-              <h2>Gastos recientes</h2>
+              <h2>{showArchived ? "Gastos archivados" : "Historial de gastos"}</h2>
             </div>
             {expenseRows.length > 0 ? (
               <span className="table-count">
@@ -426,58 +430,59 @@ export default async function ExpensesPage({
               </span>
             ) : null}
           </div>
+          <nav aria-label="Filtro del historial de gastos" className="expense-history-filters">
+            <Link
+              aria-current={showArchived ? undefined : "page"}
+              className={`button-secondary text-link${showArchived ? "" : " is-active"}`}
+              href={viewHref(false)}
+            >
+              Todos los gastos
+            </Link>
+            <Link
+              aria-current={showArchived ? "page" : undefined}
+              className={`button-secondary text-link${showArchived ? " is-active" : ""}`}
+              href={viewHref(true)}
+            >
+              Archivados
+            </Link>
+          </nav>
+          <p className="form-hint expenses-history-hint">
+            {showArchived
+              ? "Solo se archivan gastos anulados. Puedes restaurarlos al historial."
+              : "Selecciona un gasto para ver sus detalles y acciones. Del más reciente al más antiguo."}
+          </p>
           {expenseRows.length === 0 ? (
-            <p className="empty-state">Todavía no hay gastos.</p>
+            <p className="empty-state">
+              {showArchived
+                ? "No hay gastos archivados."
+                : "Todavía no hay gastos."}
+            </p>
           ) : (
             <div className="expense-list">
               {expenseRows.map((expense) => {
-                const hasClosingDeduction =
-                  expense.status === "paid" &&
-                  Boolean(expense.deduct_from_closing);
-                const closingApplied =
-                  hasClosingDeduction &&
-                  (expense.closing_status === "confirmed" ||
-                    expense.closing_status === "corrected");
-                const closingPending =
-                  hasClosingDeduction && !closingApplied;
-                let deductionLabel = "No descuenta del cierre";
-                if (expense.status === "void") {
-                  deductionLabel = "Anulado · no afecta el cierre";
-                } else if (closingApplied) {
-                  deductionLabel = "Descontado en cierre finalizado";
-                } else if (
-                  closingPending &&
-                  expense.closing_status === "draft"
-                ) {
-                  deductionLabel = "Asignado a borrador · pendiente de confirmar";
-                } else if (hasClosingDeduction) {
-                  deductionLabel = "Asignado · cierre pendiente";
-                }
-                const closingDescription =
+                const periodEffect =
                   expense.status === "void"
-                    ? "Gasto anulado"
-                    : hasClosingDeduction
-                      ? `${expense.closing_operation_date} · ${
-                          closingApplied
-                            ? "ya reflejado en el Reporte Z neto"
-                            : expense.closing_status === "draft"
-                              ? "reflejado en el borrador, aún no en el Reporte Z del período"
-                              : "se aplicará al cerrar ese día"
-                        }`
-                      : "No reduce el efectivo ni el Reporte Z";
+                    ? "Anulado; no cuenta en el saldo del período"
+                    : "Se resta del saldo del período por fecha del gasto";
+
+                const statusUrl = `/api/finance/expenses/${encodeURIComponent(String(expense.id))}/status`;
 
                 return (
-                  <article
-                    className={`expense-card${expense.status === "void" ? " expense-card-void" : ""}`}
+                  <details
+                    className={`expense-card${expense.status === "void" ? " expense-card-void" : ""}${expense.archived_at ? " expense-card-archived" : ""}`}
                     key={String(expense.id)}
                   >
-                    <header className="expense-card-header">
-                      <div className="expense-card-title">
-                        <p className="eyebrow">Proveedor</p>
-                        <h3>{expense.supplier_name}</h3>
-                        <p>{expense.incurred_on}</p>
-                      </div>
-                      <div className="expense-card-amount">
+                    <summary className="expense-card-summary">
+                      <span className="expense-card-title">
+                        <span className="eyebrow">Proveedor</span>
+                        <strong className="expense-card-supplier">
+                          {expense.supplier_name}
+                        </strong>
+                        <span className="expense-card-date">
+                          {expense.incurred_on}
+                        </span>
+                      </span>
+                      <span className="expense-card-amount">
                         <span>Importe</span>
                         <strong>{formatMoney(expense.amount)}</strong>
                         <span
@@ -485,88 +490,103 @@ export default async function ExpensesPage({
                         >
                           {expense.status === "paid" ? "Registrado" : "Anulado"}
                         </span>
-                      </div>
-                    </header>
+                      </span>
+                      <span
+                        aria-hidden="true"
+                        className="expense-card-expand-icon"
+                      />
+                    </summary>
 
-                    <div
-                      className={`expense-closing-indicator ${
-                        expense.status === "void"
-                          ? "expense-closing-void"
-                          : closingApplied
-                            ? "expense-closing-applied"
-                            : closingPending
-                              ? "expense-closing-pending"
-                              : "expense-closing-none"
-                      }`}
-                    >
-                      <strong>{deductionLabel}</strong>
-                      {hasClosingDeduction ? (
-                        <span>
-                          Fecha del cierre asignado:{" "}
-                          {expense.closing_operation_date}
-                        </span>
-                      ) : null}
-                    </div>
+                    <div className="expense-card-content">
+                      <div
+                        className={`expense-period-indicator ${
+                          expense.status === "void"
+                            ? "expense-period-indicator-void"
+                            : "expense-period-indicator-paid"
+                        }`}
+                      >
+                        <strong>
+                          {expense.archived_at
+                            ? "Gasto anulado y archivado"
+                            : expense.status === "void"
+                              ? "Gasto anulado"
+                              : "Gasto incluido en el saldo del período"}
+                        </strong>
+                        <span>Fecha usada: {expense.incurred_on}</span>
+                      </div>
 
-                    <dl className="expense-details">
-                      <div>
-                        <dt>Medio de pago</dt>
-                        <dd>
-                          {expensePaymentMethodLabels[expense.payment_method]}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>Efecto en el cierre</dt>
-                        <dd>{closingDescription}</dd>
-                      </div>
-                      <div className="expense-audit">
-                        <dt>Último cambio</dt>
-                        <dd>
-                          <AuditLabel
-                            action={expense.last_action}
-                            actorName={expense.last_actor_name}
-                            occurredAt={expense.last_action_at}
-                          />
-                        </dd>
-                      </div>
-                    </dl>
-
-                    {expense.status === "paid" ? (
-                      <div className="expense-actions">
-                        <details className="expense-edit">
-                          <summary className="button-secondary">
-                            Editar gasto
-                          </summary>
-                          <form
-                            action={`/api/finance/expenses/${encodeURIComponent(String(expense.id))}`}
-                            className="finance-form expense-edit-form"
-                            method="post"
-                          >
-                            <p className="form-hint">
-                              Actualiza los datos del gasto. Si cambias el
-                              descuento, se recalcularán los cierres afectados.
-                            </p>
-                            <ExpenseFields
-                              suppliers={supplierRows}
-                              today={today}
-                              supplierId={String(expense.supplier_id)}
-                              incurredOn={expense.incurred_on}
-                              amount={expense.amount}
-                              paymentMethod={expense.payment_method}
-                              deductFromClosing={Boolean(
-                                expense.deduct_from_closing,
-                              )}
-                              closingDate={expense.closing_operation_date}
+                      <dl className="expense-details">
+                        <div>
+                          <dt>Medio de pago</dt>
+                          <dd>
+                            {expensePaymentMethodLabels[expense.payment_method]}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Efecto en el período</dt>
+                          <dd>{periodEffect}</dd>
+                        </div>
+                        <div className="expense-audit">
+                          <dt>Último cambio</dt>
+                          <dd>
+                            <AuditLabel
+                              action={expense.last_action}
+                              actorName={expense.last_actor_name}
+                              occurredAt={expense.last_action_at}
                             />
-                            <button type="submit">Guardar cambios</button>
+                          </dd>
+                        </div>
+                      </dl>
+
+                      {expense.status === "paid" ? (
+                        <div className="expense-actions">
+                          <details className="expense-edit">
+                            <summary className="button-secondary">
+                              Editar gasto
+                            </summary>
+                            <form
+                              action={`/api/finance/expenses/${encodeURIComponent(String(expense.id))}`}
+                              className="finance-form expense-edit-form"
+                              method="post"
+                            >
+                              <p className="form-hint">
+                                Actualiza los datos del gasto. El resumen del
+                                período se recalculará por fecha del gasto.
+                              </p>
+                              <ExpenseFields
+                                suppliers={supplierRows}
+                                today={today}
+                                supplierId={String(expense.supplier_id)}
+                                incurredOn={expense.incurred_on}
+                                amount={expense.amount}
+                                paymentMethod={expense.payment_method}
+                              />
+                              <button type="submit">Guardar cambios</button>
+                            </form>
+                          </details>
+                          <ExpenseVoidConfirmation actionUrl={statusUrl} />
+                        </div>
+                      ) : (
+                        <div className="expense-actions">
+                          <form action={statusUrl} method="post">
+                            <input
+                              name="action"
+                              type="hidden"
+                              value={showArchived ? "restore" : "archive"}
+                            />
+                            <button
+                              className="button-secondary"
+                              type="submit"
+                            >
+                              {showArchived
+                                ? "Restaurar al historial"
+                                : "Archivar gasto"}
+                            </button>
                           </form>
-                        </details>
-                        <ExpenseVoidConfirmation
-                          actionUrl={`/api/finance/expenses/${encodeURIComponent(String(expense.id))}/status`}
-                        />
-                      </div>
-                    ) : null}
-                  </article>
+                        </div>
+                      )}
+                    </div>
+                  </details>
                 );
               })}
             </div>

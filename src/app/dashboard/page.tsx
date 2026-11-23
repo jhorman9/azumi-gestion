@@ -4,14 +4,10 @@ import {
   ChartNoAxesCombined,
   CircleAlert,
   CircleDollarSign,
-  CircleCheck,
-  FileText,
-  HandCoins,
   ReceiptText,
   WalletCards,
 } from "lucide-react";
 import { FinanceTrendChart } from "@/app/components/finance-trend-chart";
-import { ExpenseTreatmentBreakdown } from "@/app/components/expense-treatment-breakdown";
 import { MetricCard } from "@/app/components/metric-card";
 import { ManagerNav } from "@/app/components/manager-nav";
 import { PayablesDonutChart } from "@/app/components/payables-donut-chart";
@@ -86,7 +82,7 @@ export default async function DashboardPage({
             <p className="eyebrow">Resumen gerencial</p>
             <h1>Buenos días</h1>
             <p className="page-heading-subtitle">
-              Panorama del restaurante durante el{" "}
+              Saldos, gastos y pagos pendientes del{" "}
               {period === "year" ? "año" : "mes"} seleccionado.
             </p>
           </div>
@@ -154,62 +150,41 @@ export default async function DashboardPage({
         </form>
         <section aria-label="Indicadores del período" className="metric-grid">
           <MetricCard
-            hint="Reporte Z neto menos gastos sin descuento de cierre; puede ser negativo"
+            hint="Reporte Z neto del período antes de restar los gastos"
             icon={CircleDollarSign}
-            label="Reporte Z − gastos sin descuento"
-            tone="red"
-            value={formatMoney(summary.salesAfterUnassignedExpenses)}
+            label="Saldo total sin gastos"
+            tone="blue"
+            value={formatMoney(summary.salesTotal)}
           />
           <MetricCard
-            hint="Gastos pagados por fecha del gasto; incluye ambas categorías"
+            hint="Gastos pagados por fecha del gasto; se restan del saldo"
             icon={ReceiptText}
-            label="Gastos incurridos"
+            label="Gastos del período"
             tone="amber"
             value={formatMoney(summary.expenseIncurred)}
           />
           <MetricCard
-            hint="Según fecha de pago; incluye ambas categorías"
-            icon={CircleCheck}
-            label="Gastos pagados"
-            tone="green"
-            value={formatMoney(summary.expensePaid)}
+            hint="Saldo sin gastos menos los gastos del período; puede ser negativo"
+            icon={CircleDollarSign}
+            label="Saldo total con gastos"
+            tone={summary.salesAfterExpenses.startsWith("-") ? "red" : "green"}
+            value={formatMoney(summary.salesAfterExpenses)}
           />
           <MetricCard
-            hint="Obligaciones nuevas del período"
-            icon={FileText}
-            label="Facturas emitidas"
-            tone="blue"
-            value={formatMoney(summary.supplierBillsIssued)}
-          />
-          <MetricCard
-            hint={`Pagos realizados en el ${period === "year" ? "año" : "mes"}`}
-            icon={HandCoins}
-            label="Pagos a proveedores"
-            tone="violet"
-            value={formatMoney(summary.supplierPayments)}
-          />
-          <MetricCard
-            hint="Saldo actual de las facturas abiertas"
+            hint="Saldo actual de facturas con deuda; no depende del período"
             icon={WalletCards}
-            label="Saldo por pagar"
+            label="Pagos pendientes"
+            tone="violet"
             value={formatMoney(summary.outstandingPayables)}
           />
           <MetricCard
-            hint="Saldo vencido actual; requiere seguimiento"
+            hint="Parte de los pagos pendientes que ya venció"
             icon={CircleAlert}
-            label="Saldo vencido"
+            label="Pagos pendientes vencidos"
             tone="amber"
             value={formatMoney(summary.overduePayables)}
           />
         </section>
-        <ExpenseTreatmentBreakdown
-          closingExpenseDeductions={summary.closingExpenseDeductions}
-          expenseIncurred={summary.expenseIncurred}
-          expenseIncurredDeducted={summary.expenseIncurredDeducted}
-          expenseIncurredNotDeducted={summary.expenseIncurredNotDeducted}
-          salesTotal={summary.salesTotal}
-          salesAfterUnassignedExpenses={summary.salesAfterUnassignedExpenses}
-        />
         <div className="dashboard-bottom-grid">
           <section className="dashboard-card">
             <div className="section-heading">
@@ -224,10 +199,9 @@ export default async function DashboardPage({
               points={trend}
             />
             <p className="chart-caption">
-              El gráfico muestra el Reporte Z neto real de los cierres y los
-              gastos por fecha del gasto. El indicador del resumen resta
-              además los gastos sin descuento de cierre; no representa
-              utilidad neta.
+              El gráfico compara el Reporte Z de cada cierre con los gastos
+              registrados por fecha del gasto. El indicador del resumen resta
+              todos los gastos del período; no representa utilidad neta.
             </p>
           </section>
           <section className="dashboard-card payables-card">

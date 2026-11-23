@@ -10,7 +10,6 @@ import {
   closingPaymentChannels,
   closingPaymentTypes,
 } from "@/lib/finance/closing";
-import { todayInPanama } from "@/lib/finance/dates";
 
 function isValidBusinessDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
@@ -139,39 +138,15 @@ export const recordStatusSchema = z.object({
   is_active: z.enum(["0", "1"]),
 });
 
-export const expenseSchema = z
-  .object({
-    supplier_id: z.string().regex(/^[1-9]\d{0,19}$/),
-    incurred_on: businessDateSchema,
-    amount: positiveMoneySchema,
-    payment_method: z.enum(expensePaymentMethods),
-    deduct_from_closing: z.enum(["0", "1"]).transform((value) => value === "1"),
-    closing_operation_date: optionalDateSchema,
-  })
-  .superRefine((value, context) => {
-    if (value.deduct_from_closing && !value.closing_operation_date) {
-      context.addIssue({
-        code: "custom",
-        message: "Selecciona la fecha del cierre que recibirá el descuento.",
-        path: ["closing_operation_date"],
-      });
-    }
-
-    if (
-      value.deduct_from_closing &&
-      value.closing_operation_date &&
-      value.closing_operation_date > todayInPanama()
-    ) {
-      context.addIssue({
-        code: "custom",
-        message: "El gasto solo puede descontarse de hoy o de días anteriores.",
-        path: ["closing_operation_date"],
-      });
-    }
-  });
+export const expenseSchema = z.object({
+  supplier_id: z.string().regex(/^[1-9]\d{0,19}$/),
+  incurred_on: businessDateSchema,
+  amount: positiveMoneySchema,
+  payment_method: z.enum(expensePaymentMethods),
+});
 
 export const expenseStatusSchema = z.object({
-  action: z.literal("void"),
+  action: z.enum(["void", "archive", "restore"]),
 });
 
 export const billSchema = z

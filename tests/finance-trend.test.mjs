@@ -8,22 +8,18 @@ test("builds a complete daily series including leap days and zero-value days", (
     "day",
     {
       sales: [{ bucket: "2024-02-29", amount: "125.50" }],
-      expenseTreatment: [
-        { bucket: "2024-02-29", deducted: "15.00", notDeducted: "10.00" },
-      ],
+      expensesIncurred: [{ bucket: "2024-02-29", amount: "25.00" }],
     },
   );
 
   assert.equal(points.length, 29);
   assert.equal(points[0]?.bucket, "2024-02-01");
   assert.equal(points[0]?.salesTotal, "0.00");
-  assert.equal(points[0]?.expenseDeducted, "0.00");
-  assert.equal(points[0]?.expenseNotDeducted, "0.00");
+  assert.equal(points[0]?.expenseIncurred, "0.00");
   assert.equal(points[28]?.bucket, "2024-02-29");
   assert.equal(points[28]?.label, "29");
   assert.equal(points[28]?.salesTotal, "125.50");
-  assert.equal(points[28]?.expenseDeducted, "15.00");
-  assert.equal(points[28]?.expenseNotDeducted, "10.00");
+  assert.equal(points[28]?.expenseIncurred, "25.00");
 });
 
 test("builds all twelve monthly buckets for a selected calendar year", () => {
@@ -32,7 +28,7 @@ test("builds all twelve monthly buckets for a selected calendar year", () => {
     "month",
     {
       sales: [{ bucket: "2025-07", amount: "900.00" }],
-      expenseTreatment: [],
+      expensesIncurred: [],
     },
   );
 

@@ -48,8 +48,8 @@ export function ExpenseVoidConfirmation({
           </div>
         </div>
         <p id={descriptionId}>
-          El gasto quedará anulado y dejará de descontarse del cierre. Esta
-          acción no se puede deshacer.
+          El gasto quedará anulado y dejará de restarse del saldo del período.
+          Esta acción no se puede deshacer.
         </p>
         <div className="void-confirmation-dialog__actions">
           <button

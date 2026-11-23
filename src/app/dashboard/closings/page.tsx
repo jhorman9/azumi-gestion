@@ -20,7 +20,6 @@ interface ClosingRow extends RowDataPacket {
   cash_total: string;
   cash_outflow_total: string;
   bank_total: string;
-  expense_deduction_total: string;
   last_action: string | null;
   last_actor_name: string | null;
   last_action_at: string | null;
@@ -47,8 +46,6 @@ const pageSize = 10;
 const errorMessages: Record<string, string> = {
   invalid: "Revisa los datos del cierre.",
   duplicate: "Ya existe un cierre para esa fecha.",
-  "deduction-exceeds-cash":
-    "Las salidas de caja y los gastos descontados superan el efectivo contado.",
   "outflow-invalid":
     "Completa cada salida y verifica que su suma no supere el efectivo contado.",
   failed: "No fue posible guardar el cierre.",
@@ -141,13 +138,6 @@ export default async function ClosingsPage({
               FROM daily_closing_cash_outflows o
               WHERE o.daily_closing_id = c.id
             ), 0.00) AS cash_outflow_total,
-            COALESCE((
-              SELECT SUM(e.amount)
-              FROM expenses e
-              WHERE e.closing_operation_date = c.operation_date
-                AND e.deduct_from_closing = 1
-                AND e.status = 'paid'
-            ), 0.00) AS expense_deduction_total,
             COALESCE((
               SELECT SUM(p.amount)
               FROM daily_closing_channel_payments p
@@ -261,7 +251,6 @@ export default async function ClosingsPage({
                     <th scope="col">Total banco</th>
                     <th scope="col">Efectivo neto</th>
                     <th scope="col">Salidas de caja</th>
-                    <th scope="col">Gastos restados</th>
                     <th scope="col">Estado</th>
                     <th scope="col">Último cambio</th>
                     <th scope="col">Detalle</th>
@@ -276,7 +265,6 @@ export default async function ClosingsPage({
                       <td>{formatMoney(closing.bank_total)}</td>
                       <td>{formatMoney(closing.cash_total)}</td>
                       <td>{formatMoney(closing.cash_outflow_total)}</td>
-                      <td>{formatMoney(closing.expense_deduction_total)}</td>
                       <td>{statusLabels[closing.status]}</td>
                       <td>
                         <AuditLabel
